@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package aecp.coordinator.v1;
+
+option go_package = "aecp/proto/coordinator/v1;coordinatorv1";
+
+import "google/protobuf/timestamp.proto";
+import "common/v1/common.proto";
+
+// AssignmentRequest is raised by the scheduler when a task node becomes
+// ready (all dependencies satisfied) and needs an agent.
+message AssignmentRequest {
+  string task_id = 1;
+  string tenant_id = 2;
+}
+
+message AssignmentDecision {
+  string task_id = 1;
+  string agent_id = 2;
+  aecp.common.v1.RiskTier granted_risk_tier = 3;
+  string rationale = 4;
+}
+
+message ScheduleRequest {
+  string tenant_id = 1;
+}
+
+message ScheduleResponse {
+  repeated AssignmentDecision decisions = 1;
+}
+
+message EscalateRequest {
+  string task_id = 1;
+  string agent_id = 2;
+  string reason = 3;
+  aecp.common.v1.RiskTier requested_risk_tier = 4;
+}
+
+message EscalateResponse {
+  bool approved = 1;
+  string decided_by = 2;
+}
+
+message ReportBlockerRequest {
+  string task_id = 1;
+  string agent_id = 2;
+  string description = 3;
+}
+
+message ReportBlockerResponse {
+  bool acknowledged = 1;
+}
+
+// CoordinatorService is the only component allowed to make cross-agent
+// tradeoffs: scheduling, assignment, and escalation decisions. Agent
+// workers never talk to each other directly; everything routes here.
+service CoordinatorService {
+  // Schedule evaluates ready task nodes and produces assignment decisions
+  // for the current tick. Sequencing (what runs in parallel vs. serial)
+  // is decided here, not by individual agents.
+  rpc Schedule(ScheduleRequest) returns (ScheduleResponse);
+
+  // Escalate is called by an agent that discovers a task is bigger than
+  // its granted risk tier. The agent must halt and wait for a decision
+  // rather than proceeding at its own judgment.
+  rpc Escalate(EscalateRequest) returns (EscalateResponse);
+
+  rpc ReportBlocker(ReportBlockerRequest) returns (ReportBlockerResponse);
+}

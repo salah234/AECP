@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package aecp.observability.v1;
+
+option go_package = "aecp/proto/observability/v1;observabilityv1";
+
+import "google/protobuf/timestamp.proto";
+import "common/v1/common.proto";
+
+message RecordAuditEventRequest {
+  aecp.common.v1.AuditEvent event = 1;
+}
+
+message RecordAuditEventResponse {
+  string event_id = 1;
+}
+
+message QueryAuditEventsRequest {
+  string tenant_id = 1;
+  google.protobuf.Timestamp since = 2;
+  bool security_relevant_only = 3;
+}
+
+message QueryAuditEventsResponse {
+  repeated aecp.common.v1.AuditEvent events = 1;
+}
+
+// AuditService is the single write path for the escalation audit trail.
+// Every other service calls RecordAuditEvent instead of writing to its
+// own log for anything security-relevant or Tier 2+.
+service AuditService {
+  rpc RecordAuditEvent(RecordAuditEventRequest) returns (RecordAuditEventResponse);
+  rpc QueryAuditEvents(QueryAuditEventsRequest) returns (QueryAuditEventsResponse);
+}

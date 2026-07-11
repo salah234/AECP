@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package aecp.integration.v1;
+
+option go_package = "aecp/proto/integration/v1;integrationv1";
+
+import "google/protobuf/timestamp.proto";
+import "common/v1/common.proto";
+
+enum ConflictKind {
+  CONFLICT_KIND_UNSPECIFIED = 0;
+  CONFLICT_KIND_TEXTUAL = 1;     // overlapping diff hunks
+  CONFLICT_KIND_SEMANTIC = 2;    // individually valid, jointly incoherent
+  CONFLICT_KIND_OWNERSHIP = 3;   // touched files outside declared boundary
+}
+
+message ConflictReport {
+  string report_id = 1;
+  string tenant_id = 2;
+  ConflictKind kind = 3;
+  repeated string task_ids = 4;
+  string description = 5;
+  bool auto_resolvable = 6;
+  google.protobuf.Timestamp detected_at = 7;
+}
+
+message MergePolicyDecision {
+  string report_id = 1;
+  bool auto_merge = 2;
+  bool requires_human = 3;
+  string rationale = 4;
+}
+
+message DetectConflictsRequest {
+  string tenant_id = 1;
+  repeated string candidate_task_ids = 2;
+}
+
+message DetectConflictsResponse {
+  repeated ConflictReport reports = 1;
+}
+
+message ResolveMergePolicyRequest {
+  string report_id = 1;
+  aecp.common.v1.RiskTier risk_tier = 2;
+}
+
+message ResolveMergePolicyResponse {
+  MergePolicyDecision decision = 1;
+}
+
+message SemanticDiffRequest {
+  string tenant_id = 1;
+  string task_id_a = 2;
+  string task_id_b = 3;
+}
+
+message SemanticDiffResponse {
+  bool jointly_coherent = 1;
+  string explanation = 2;
+}
+
+// IntegrationService handles what happens when parallel agents produce
+// overlapping or contradictory changes. Merge policy is explicit per risk
+// tier: some conflicts auto-resolve, some block on a human.
+service IntegrationService {
+  rpc DetectConflicts(DetectConflictsRequest) returns (DetectConflictsResponse);
+  rpc ResolveMergePolicy(ResolveMergePolicyRequest) returns (ResolveMergePolicyResponse);
+  rpc SemanticDiff(SemanticDiffRequest) returns (SemanticDiffResponse);
+}

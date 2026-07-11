@@ -1,0 +1,88 @@
+# taskgraph, state, integration, observability: ingress only from the
+# services that legitimately call them; egress limited to Postgres/DNS
+# plus, for state, object storage.
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: taskgraph-ingress
+  namespace: aecp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: taskgraph
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app.kubernetes.io/component: coordinator } }
+        - podSelector: { matchLabels: { app.kubernetes.io/component: gateway } }
+        - podSelector: { matchLabels: { app.kubernetes.io/component: integration } }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: state-ingress
+  namespace: aecp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: state
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app.kubernetes.io/component: coordinator } }
+        - podSelector: { matchLabels: { app.kubernetes.io/component: agents } }
+        - podSelector: { matchLabels: { app.kubernetes.io/component: gateway } }
+        - podSelector: { matchLabels: { app.kubernetes.io/component: integration } }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: integration-ingress
+  namespace: aecp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: integration
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app.kubernetes.io/component: coordinator } }
+        - podSelector: { matchLabels: { app.kubernetes.io/component: gateway } }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: observability-ingress
+  namespace: aecp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: observability
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: {} # every service may write audit events
+      ports:
+        - port: 50051
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: data-plane-egress-postgres-dns
+  namespace: aecp
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [taskgraph, state, integration, observability]
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector: { matchLabels: { app.kubernetes.io/component: postgres } }
+      ports:
+        - port: 5432
+    - ports:
+        - port: 53
+          protocol: UDP

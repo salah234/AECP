@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package aecp.taskgraph.v1;
+
+option go_package = "aecp/proto/taskgraph/v1;taskgraphv1";
+
+import "google/protobuf/timestamp.proto";
+import "common/v1/common.proto";
+
+// TaskNode is the fundamental unit of work in AECP. Work is never a flat
+// queue: every node carries explicit dependencies, an ownership boundary,
+// a definition of done, and a risk tier.
+message TaskNode {
+  string task_id = 1;
+  string tenant_id = 2;
+  string title = 3;
+  string description = 4;
+  aecp.common.v1.RiskTier risk_tier = 5;
+  aecp.common.v1.TaskStatus status = 6;
+  aecp.common.v1.OwnershipBoundary ownership = 7;
+  repeated string depends_on_task_ids = 8;
+  repeated string blocks_task_ids = 9;
+  DefinitionOfDone definition_of_done = 10;
+  string assigned_agent_id = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+}
+
+message DefinitionOfDone {
+  repeated string required_checks = 1;
+  repeated string acceptance_criteria = 2;
+  bool requires_human_review_gate = 3;
+}
+
+message CreateTaskNodeRequest {
+  TaskNode node = 1;
+}
+
+message CreateTaskNodeResponse {
+  TaskNode node = 1;
+}
+
+message GetTaskNodeRequest {
+  string task_id = 1;
+}
+
+message GetTaskNodeResponse {
+  TaskNode node = 1;
+}
+
+message UpdateTaskStatusRequest {
+  string task_id = 1;
+  aecp.common.v1.TaskStatus status = 2;
+  string reason = 3;
+}
+
+message UpdateTaskStatusResponse {
+  TaskNode node = 1;
+}
+
+message ListReadyTaskNodesRequest {
+  // Nodes whose dependencies are all TASK_STATUS_DONE and are not blocked.
+  string tenant_id = 1;
+}
+
+message ListReadyTaskNodesResponse {
+  repeated TaskNode nodes = 1;
+}
+
+message ValidateOwnershipRequest {
+  string task_id = 1;
+  repeated string changed_paths = 2;
+}
+
+message ValidateOwnershipResponse {
+  bool within_boundary = 1;
+  repeated string violating_paths = 2;
+}
+
+// TaskGraphService owns task decomposition, dependency resolution, and
+// ownership boundary bookkeeping. It does not decide assignment or
+// sequencing across agents — that is the Coordinator's job.
+service TaskGraphService {
+  rpc CreateTaskNode(CreateTaskNodeRequest) returns (CreateTaskNodeResponse);
+  rpc GetTaskNode(GetTaskNodeRequest) returns (GetTaskNodeResponse);
+  rpc UpdateTaskStatus(UpdateTaskStatusRequest) returns (UpdateTaskStatusResponse);
+  rpc ListReadyTaskNodes(ListReadyTaskNodesRequest) returns (ListReadyTaskNodesResponse);
+  rpc ValidateOwnership(ValidateOwnershipRequest) returns (ValidateOwnershipResponse);
+}

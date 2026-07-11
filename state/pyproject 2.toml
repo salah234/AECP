@@ -1,0 +1,26 @@
+[project]
+name = "aecp-state"
+version = "0.1.0"
+description = "The State & Memory Layer: decision log, ownership map, interface contracts, drift detection. This is the source of truth; task graph and agent context are derived views over it."
+requires-python = ">=3.12"
+dependencies = [
+    "aecp-platform",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "grpcio>=1.68",
+    "asyncpg>=0.30",
+    "pydantic>=2.9",
+]
+
+[tool.uv.sources]
+aecp-platform = { path = "../platform", editable = true }
+
+[dependency-groups]
+dev = ["ruff>=0.7", "mypy>=1.13", "pytest>=8.3", "pytest-asyncio>=0.24"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

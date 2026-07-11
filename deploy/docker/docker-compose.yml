@@ -1,0 +1,109 @@
+version: "3.9"
+
+# Local development topology only. Production runs on Kubernetes
+# (see deploy/k8s) with mTLS between services and no plaintext internal
+# traffic; this compose file uses a shared bridge network for simplicity
+# and is not a security reference.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: aecp
+      POSTGRES_PASSWORD: aecp_dev_only
+      POSTGRES_DB: aecp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [aecp]
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4317:4317"
+    networks: [aecp]
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"
+    networks: [aecp]
+
+  taskgraph:
+    build:
+      context: ../..
+      dockerfile: taskgraph/Dockerfile
+    depends_on: [postgres, otel-collector]
+    env_file: ../../.env
+    networks: [aecp]
+
+  state:
+    build:
+      context: ../..
+      dockerfile: state/Dockerfile
+    depends_on: [postgres, otel-collector]
+    env_file: ../../.env
+    networks: [aecp]
+
+  coordinator:
+    build:
+      context: ../..
+      dockerfile: coordinator/Dockerfile
+    depends_on: [taskgraph, state, otel-collector]
+    env_file: ../../.env
+    networks: [aecp]
+
+  agents:
+    build:
+      context: ../..
+      dockerfile: agents/Dockerfile
+    depends_on: [coordinator, state, otel-collector]
+    env_file: ../../.env
+    networks: [aecp]
+
+  integration:
+    build:
+      context: ../..
+      dockerfile: integration/Dockerfile
+    depends_on: [taskgraph, state, otel-collector]
+    env_file: ../../.env
+    networks: [aecp]
+
+  observability:
+    build:
+      context: ../..
+      dockerfile: observability/Dockerfile
+    depends_on: [postgres, otel-collector]
+    env_file: ../../.env
+    networks: [aecp]
+
+  gateway:
+    build:
+      context: ../..
+      dockerfile: gateway/Dockerfile
+    depends_on: [coordinator, taskgraph, state, integration, observability]
+    ports:
+      - "8080:8080"
+    env_file: ../../.env
+    networks: [aecp]
+
+  dashboard:
+    build:
+      context: ../..
+      dockerfile: dashboard/Dockerfile
+    depends_on: [gateway]
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_GATEWAY_URL: "http://localhost:8080"
+    networks: [aecp]
+
+networks:
+  aecp:
+    driver: bridge
+
+volumes:
+  pgdata:

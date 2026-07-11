@@ -1,0 +1,38 @@
+# Deliberately narrow: agent worker pods may only reach the Coordinator
+# (for scheduling/escalation) and the State Layer (for hydration). They
+# have NO edge to taskgraph, integration, observability, the gateway, or
+# — critically — each other. This is the network-level backstop for
+# CLAUDE.md's key invariant; identity.AllowList in aecp_platform provides
+# the application-level backstop on top of it.
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agents-ingress-from-coordinator-only
+  namespace: aecp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: agents
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app.kubernetes.io/component: coordinator } }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agents-egress-coordinator-and-state-only
+  namespace: aecp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: agents
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector: { matchLabels: { app.kubernetes.io/component: coordinator } }
+        - podSelector: { matchLabels: { app.kubernetes.io/component: state } }
+    - ports:
+        - port: 53
+          protocol: UDP

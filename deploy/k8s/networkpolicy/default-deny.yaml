@@ -1,0 +1,15 @@
+# Default-deny all ingress and egress in the aecp namespace. Every
+# legitimate edge in the coordination topology must be an explicit
+# NetworkPolicy below — this is the network-layer enforcement of
+# CLAUDE.md's "no agent-to-agent communication, ever" invariant: it is
+# not just a convention, a compromised agent pod cannot open a connection
+# to another agent pod even if it tries.
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: aecp
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]

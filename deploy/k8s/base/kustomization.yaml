@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: aecp
+resources:
+  - namespace.yaml
+  - gateway-deployment.yaml
+  # coordinator-deployment.yaml, taskgraph-deployment.yaml,
+  # agents-deployment.yaml, state-deployment.yaml,
+  # integration-deployment.yaml, observability-deployment.yaml,
+  # dashboard-deployment.yaml: same template as gateway-deployment.yaml,
+  # add during implementation.
+  - ../networkpolicy

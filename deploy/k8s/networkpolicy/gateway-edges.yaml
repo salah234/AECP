@@ -1,0 +1,53 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-ingress-from-ingress-controller
+  namespace: aecp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: gateway
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-egress-to-internal-services
+  namespace: aecp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: gateway
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: coordinator
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: taskgraph
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: state
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: integration
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: observability
+    - to: # OIDC provider + DNS
+        - namespaceSelector: {}
+      ports:
+        - port: 443
+          protocol: TCP
+    - ports:
+        - port: 53
+          protocol: UDP

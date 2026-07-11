@@ -1,0 +1,58 @@
+# Reference template. Each of coordinator/taskgraph/agents/state/
+# integration/observability gets an equivalent Deployment+Service pair
+# with app.kubernetes.io/component set to its service name and no
+# externally reachable Service type (ClusterIP only) — gateway is the
+# sole exception with a LoadBalancer/Ingress in front of it.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: aecp
+  labels:
+    app.kubernetes.io/name: aecp
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: gateway
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gateway
+          image: aecp/gateway:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: gateway-env
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: aecp
+spec:
+  selector:
+    app.kubernetes.io/component: gateway
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP

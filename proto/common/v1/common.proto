@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package aecp.common.v1;
+
+option go_package = "aecp/proto/common/v1;commonv1";
+
+import "google/protobuf/timestamp.proto";
+
+// RiskTier gates how much human involvement a task node requires before
+// it can merge. See CLAUDE.md "Escalation Policy".
+enum RiskTier {
+  RISK_TIER_UNSPECIFIED = 0;
+  RISK_TIER_MECHANICAL = 1;   // auto-merge on green CI
+  RISK_TIER_LOCAL = 2;        // async review, non-blocking
+  RISK_TIER_STRUCTURAL = 3;   // human approval required before merge
+  RISK_TIER_ARCHITECTURAL = 4; // human-authored only; agents may propose, never merge
+}
+
+enum TaskStatus {
+  TASK_STATUS_UNSPECIFIED = 0;
+  TASK_STATUS_PENDING = 1;
+  TASK_STATUS_BLOCKED = 2;
+  TASK_STATUS_ASSIGNED = 3;
+  TASK_STATUS_IN_PROGRESS = 4;
+  TASK_STATUS_IN_REVIEW = 5;
+  TASK_STATUS_ESCALATED = 6;
+  TASK_STATUS_DONE = 7;
+  TASK_STATUS_ABANDONED = 8;
+}
+
+// Tenant is attached to every request that crosses a service boundary so
+// downstream services can enforce row-level isolation without trusting a
+// client-supplied field.
+message TenantContext {
+  string tenant_id = 1;
+}
+
+// OwnershipBoundary declares the exact files/modules/interfaces a task
+// node may touch. Enforced by the Integration layer at merge time.
+message OwnershipBoundary {
+  repeated string path_globs = 1;
+  repeated string forbidden_globs = 2;
+}
+
+message Actor {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_HUMAN = 1;
+    KIND_AGENT = 2;
+    KIND_COORDINATOR = 3;
+  }
+  Kind kind = 1;
+  string id = 2;
+}
+
+message AuditEvent {
+  string event_id = 1;
+  string tenant_id = 2;
+  Actor actor = 3;
+  string action = 4;
+  string resource = 5;
+  bool security_relevant = 6;
+  google.protobuf.Timestamp occurred_at = 7;
+}

@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package aecp.agents.v1;
+
+option go_package = "aecp/proto/agents/v1;agentsv1";
+
+import "google/protobuf/timestamp.proto";
+import "common/v1/common.proto";
+
+enum AgentSessionStatus {
+  AGENT_SESSION_STATUS_UNSPECIFIED = 0;
+  AGENT_SESSION_STATUS_HYDRATING = 1;
+  AGENT_SESSION_STATUS_ACTIVE = 2;
+  AGENT_SESSION_STATUS_HANDOFF_PENDING = 3;
+  AGENT_SESSION_STATUS_TERMINATED = 4;
+  AGENT_SESSION_STATUS_FAILED = 5;
+}
+
+// AgentSession is disposable and stateless by design: all durable
+// knowledge lives in the State Layer, never in a session's own scratch
+// context, so a dead/timed-out session can be resumed by a different
+// instance with no loss of continuity.
+message AgentSession {
+  string session_id = 1;
+  string tenant_id = 2;
+  string task_id = 3;
+  AgentSessionStatus status = 4;
+  aecp.common.v1.RiskTier granted_risk_tier = 5;
+  google.protobuf.Timestamp spawned_at = 6;
+  google.protobuf.Timestamp expires_at = 7;
+}
+
+message SpawnSessionRequest {
+  string tenant_id = 1;
+  string task_id = 2;
+  aecp.common.v1.RiskTier granted_risk_tier = 3;
+}
+
+message SpawnSessionResponse {
+  AgentSession session = 1;
+}
+
+message HydrateContextRequest {
+  string session_id = 1;
+}
+
+// HydrateContextResponse carries only what the State Layer says this
+// session is allowed to see: its own task node, its ownership boundary,
+// and applicable interface contracts. Never other agents' work directly.
+message HydrateContextResponse {
+  bytes context_bundle = 1;
+  string context_bundle_uri = 2;
+}
+
+message HandoffSessionRequest {
+  string session_id = 1;
+  string reason = 2;
+}
+
+message HandoffSessionResponse {
+  AgentSession new_session = 1;
+}
+
+message TerminateSessionRequest {
+  string session_id = 1;
+  string reason = 2;
+}
+
+message TerminateSessionResponse {
+  bool terminated = 1;
+}
+
+// AgentPoolService manages agent lifecycle: spin-up, context hydration,
+// handoff, and teardown. It never mediates communication between two
+// agent sessions.
+service AgentPoolService {
+  rpc SpawnSession(SpawnSessionRequest) returns (SpawnSessionResponse);
+  rpc HydrateContext(HydrateContextRequest) returns (HydrateContextResponse);
+  rpc HandoffSession(HandoffSessionRequest) returns (HandoffSessionResponse);
+  rpc TerminateSession(TerminateSessionRequest) returns (TerminateSessionResponse);
+}

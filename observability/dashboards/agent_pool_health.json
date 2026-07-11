@@ -1,0 +1,5 @@
+{
+  "title": "AECP - Agent Pool Health",
+  "description": "Placeholder Grafana dashboard definition. Populate panels once metrics.py's Prometheus series are implemented: agent_pool_capacity, agent_pool_in_use, task_completion_total, escalation_total, conflict_detected_total, drift_report_open_total.",
+  "panels": []
+}

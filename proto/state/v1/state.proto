@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package aecp.state.v1;
+
+option go_package = "aecp/proto/state/v1;statev1";
+
+import "google/protobuf/timestamp.proto";
+import "common/v1/common.proto";
+
+// The State & Memory Layer is the source of truth. Task graph and agent
+// context are derived views over it, not the other way around.
+
+message DecisionLogEntry {
+  string entry_id = 1;
+  string tenant_id = 2;
+  string task_id = 3;
+  string summary = 4;
+  string rationale = 5;
+  aecp.common.v1.Actor decided_by = 6;
+  google.protobuf.Timestamp decided_at = 7;
+}
+
+message OwnershipRecord {
+  string tenant_id = 1;
+  string module_path = 2;
+  string last_task_id = 3;
+  string last_agent_id = 4;
+  google.protobuf.Timestamp last_touched_at = 5;
+}
+
+message InterfaceContract {
+  string contract_id = 1;
+  string tenant_id = 2;
+  string name = 3;
+  string schema = 4;
+  int32 version = 5;
+  bool frozen = 6;
+}
+
+message DriftReport {
+  string report_id = 1;
+  string tenant_id = 2;
+  string contract_id = 3;
+  string description = 4;
+  bool resolved = 5;
+  google.protobuf.Timestamp detected_at = 6;
+}
+
+message RecordDecisionRequest {
+  DecisionLogEntry entry = 1;
+}
+
+message RecordDecisionResponse {
+  DecisionLogEntry entry = 1;
+}
+
+message GetOwnershipRequest {
+  string tenant_id = 1;
+  string module_path = 2;
+}
+
+message GetOwnershipResponse {
+  OwnershipRecord record = 1;
+}
+
+message GetInterfaceContractRequest {
+  string contract_id = 1;
+}
+
+message GetInterfaceContractResponse {
+  InterfaceContract contract = 1;
+}
+
+message ReportDriftRequest {
+  DriftReport report = 1;
+}
+
+message ReportDriftResponse {
+  DriftReport report = 1;
+}
+
+service StateService {
+  rpc RecordDecision(RecordDecisionRequest) returns (RecordDecisionResponse);
+  rpc GetOwnership(GetOwnershipRequest) returns (GetOwnershipResponse);
+  rpc GetInterfaceContract(GetInterfaceContractRequest) returns (GetInterfaceContractResponse);
+  rpc ReportDrift(ReportDriftRequest) returns (ReportDriftResponse);
+}
