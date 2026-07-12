@@ -43,6 +43,16 @@ CREATE TABLE drift_reports (
     detected_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE module_states (
+    tenant_id       UUID NOT NULL,
+    module_path     TEXT NOT NULL,
+    contract_id     UUID NOT NULL,
+    current_schema  TEXT NOT NULL,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    PRIMARY KEY (tenant_id, module_path)
+);
+
 CREATE INDEX idx_decision_log_tenant_task ON decision_log_entries (tenant_id, task_id);
 CREATE INDEX idx_drift_reports_tenant_unresolved ON drift_reports (tenant_id) WHERE NOT resolved;
 

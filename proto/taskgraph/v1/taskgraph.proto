@@ -10,6 +10,7 @@ import "common/v1/common.proto";
 // TaskNode is the fundamental unit of work in AECP. Work is never a flat
 // queue: every node carries explicit dependencies, an ownership boundary,
 // a definition of done, and a risk tier.
+
 message TaskNode {
   string task_id = 1;
   string tenant_id = 2;
@@ -21,7 +22,7 @@ message TaskNode {
   repeated string depends_on_task_ids = 8;
   repeated string blocks_task_ids = 9;
   DefinitionOfDone definition_of_done = 10;
-  string assigned_agent_id = 11;
+  string assigned_agent_id = 11; 
   google.protobuf.Timestamp created_at = 12;
   google.protobuf.Timestamp updated_at = 13;
 }

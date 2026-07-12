@@ -1,7 +1,7 @@
 """Context hydration: builds the exact context bundle a new/resumed agent
 session is allowed to see.
 
-Per CLAUDE.md's key invariant, an agent should only ever need to look at
+An agent should only ever need to look at
 its own task node, its ownership boundary, and the State Layer's
 contracts — never another agent's work directly. This module is
 responsible for enforcing that boundary at hydration time, not trusting
