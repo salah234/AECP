@@ -8,8 +8,10 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "grpcio>=1.68",
+    "grpcio-tools>=1.68",
     "asyncpg>=0.30",
     "pydantic>=2.9",
+    "hypercorn",
 ]
 
 [tool.uv.sources]

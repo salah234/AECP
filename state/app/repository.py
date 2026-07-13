@@ -12,6 +12,7 @@ from __future__ import annotations
 from __future__ import annotations
 from state.app.decision_log import DecisionLogEntry
 from state.app.drift import ModuleState, DriftReport
+from state.app.ownership_map import OwnershipRecord
 
 class StateRepository:
     def __init__(self, pool, object_storage_client) -> None:
@@ -24,17 +25,28 @@ class StateRepository:
             await conn.execute(
                 """
                 INSERT INTO decision_log_entries (
-                    tenant_id,
-                    task_id,
-                    decision,
-                    created_at
-                )
-                VALUES ($1, $2, $3, $4)
-                """,
-                entry.tenant_id,
-                entry.task_id,
-                entry.decision,
-                entry.created_at,
+                entry_id,
+                tenant_id,
+                task_id,
+                summary,
+                rationale,
+                decided_by_kind,
+                decided_by_id,
+                decided_at,
+                supersedes_entry_id
+            )
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+            """,
+            entry.entry_id,
+            entry.tenant_id,
+            entry.task_id,
+            entry.summary,
+            entry.rationale,
+            entry.decided_by_kind,
+            entry.decided_by_id,
+            entry.decided_at,
+            entry.supersedes_entry_id
+
             )
     
     async def upsert_ownership(self, record) -> None:
@@ -43,18 +55,46 @@ class StateRepository:
                 """
                 INSERT INTO ownership (
                     tenant_id,
-                    agent_id,
-                    resource_id
+                    module_path,
+                    last_task_id,
+                    last_agent_id,
+                    last_touched_at
                 )
-                VALUES ($1, $2, $3)
-                ON CONFLICT (resource_id)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (tenant_id, module_path)
                 DO UPDATE SET
-                    agent_id = EXCLUDED.agent_id
+                    last_task_id = EXCLUDED.last_task_id,
+                    last_agent_id = EXCLUDED.last_agent_id,
+                    last_touched_at = EXCLUDED.last_touched_at
                 """,
                 record.tenant_id,
-                record.agent_id,
-                record.resource_id,
+                record.module_path,
+                record.last_task_id,
+                record.last_agent_id,
+                record.last_touched_at,
             )
+            
+    async def get_ownership(
+        self,
+        tenant_id: str,
+        module_path: str,
+    ) -> OwnershipRecord | None:
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT *
+                FROM ownership
+                WHERE tenant_id = $1
+                AND module_path = $2
+                """,
+                tenant_id,
+                module_path,
+            )
+
+        if row is None:
+            return None
+
+        return OwnershipRecord(**dict(row))
 
 
     async def get_contract(self, contract_id: str):

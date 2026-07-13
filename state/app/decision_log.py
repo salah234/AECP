@@ -29,9 +29,10 @@ class DecisionLog:
     def __init__(self, repository) -> None:
         self.repository = repository
 
-    async def record(self, entry: DecisionLogEntry) -> DecisionLogEntry:
+    async def record(self, entry: DecisionLogEntry) -> None:
         """Append a new entry. Never mutates or removes an existing one."""
-        return await self.repository.insert_decision(entry)
+        
+        await self.repository.insert_decision(entry)
 
     async def history_for_task(self, task_id: str) -> list[DecisionLogEntry]:
         return await self.repository.get_decisions_by_task(task_id)
