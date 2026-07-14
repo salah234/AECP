@@ -10,9 +10,9 @@ Postgres — this repository only stores their URIs.
 from __future__ import annotations
 
 from __future__ import annotations
-from state.app.decision_log import DecisionLogEntry
-from state.app.drift import ModuleState, DriftReport
-from state.app.ownership_map import OwnershipRecord
+from app.decision_log import DecisionLogEntry
+from app.drift import ModuleState, DriftReport
+from app.ownership_map import OwnershipRecord
 
 class StateRepository:
     def __init__(self, pool, object_storage_client) -> None:

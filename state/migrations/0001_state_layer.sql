@@ -47,7 +47,7 @@ CREATE TABLE module_states (
     tenant_id       UUID NOT NULL,
     module_path     TEXT NOT NULL,
     contract_id     UUID NOT NULL,
-    current_schema  TEXT NOT NULL,
+    schema_definition  TEXT NOT NULL,
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     PRIMARY KEY (tenant_id, module_path)

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import FastAPI
+import asyncpg
 import hypercorn.asyncio
+from fastapi import FastAPI
 from hypercorn.config import Config
 
 from app.config import Settings
@@ -14,86 +15,71 @@ from app.decision_log import DecisionLog
 from app.ownership_map import OwnershipMap
 from app.contracts import ContractRegistry
 from app.drift import DriftDetector
+from app.grpc_server import StateServicer, build_server
 
-from app.grpc_server import (
-    StateServicer,
-    build_server,
+
+app = FastAPI(
+    title="aecp-state",
 )
-
-
-app = FastAPI(title="aecp-state")
 
 
 repository: StateRepository | None = None
 
 
 @app.get("/healthz")
-async def healthz() -> dict:
-    """
-    Liveness probe.
-
-    Kubernetes uses this to know the process is alive.
-    """
+async def healthz() -> dict[str, str]:
     return {
-        "status": "ok"
+        "status": "ok",
     }
 
 
 @app.get("/readyz")
-async def readyz() -> dict:
-    """
-    Readiness probe.
-
-    Kubernetes uses this before sending traffic.
-    """
-
+async def readyz() -> dict[str, str]:
     if repository is None:
         return {
-            "status": "not_ready"
+            "status": "not_ready",
         }
 
     return {
-        "status": "ready"
+        "status": "ready",
     }
 
 
 async def serve_grpc() -> None:
     """
-    Initialize dependencies and run gRPC server.
+    Initialize dependencies and start gRPC.
     """
 
     global repository
 
     settings = Settings.from_env()
+    print(settings.allowed_callers)
+
+    from aecp_platform.storage import ObjectStorageClient
 
     pool = await asyncpg.create_pool(
-        settings.postgres_dsn
+        settings.postgres_dsn,
     )
 
     object_storage = ObjectStorageClient(
-        bucket=settings.object_storage_bucket
+        bucket=settings.object_storage_bucket,
     )
 
     repository = StateRepository(
-        pool,
-        object_storage,
+        pool=pool,
+        object_storage_client=object_storage,
     )
 
-
-    # -------------------------
-    # Application Services
-    # -------------------------
-
     decision_log = DecisionLog(
-        repository
+        repository,
     )
 
     ownership_map = OwnershipMap(
-        repository
+        repository,
     )
 
     contract_registry = ContractRegistry(
-        repository
+        repository,
     )
 
     drift_detector = DriftDetector(
@@ -102,11 +88,6 @@ async def serve_grpc() -> None:
         repository,
     )
 
-
-    # -------------------------
-    # gRPC Layer
-    # -------------------------
-
     servicer = StateServicer(
         decision_log=decision_log,
         ownership_map=ownership_map,
@@ -114,34 +95,33 @@ async def serve_grpc() -> None:
         drift_detector=drift_detector,
     )
 
-
     server = build_server(
         servicer=servicer,
-        mtls_config=settings.mtls,
-        allow_list=settings.allow_list,
+        mtls_cert_file=settings.mtls_cert_file,
+        mtls_key_file=settings.mtls_key_file,
+        mtls_ca_file=settings.mtls_ca_file,
+        allow_list=settings.allowed_callers,
+        port=settings.grpc_port,
     )
-
 
     await server.start()
 
-    print(
-        "AECP State gRPC server running on :50051"
-    )
-
+    print("AECP State gRPC server running")
 
     await server.wait_for_termination()
 
 
-
 async def serve_http() -> None:
     """
-    Run FastAPI health server.
+    Start HTTP health server.
     """
 
     config = Config()
 
+    settings = Settings.from_env()
+
     config.bind = [
-        "0.0.0.0:8080"
+        f"0.0.0.0:{settings.http_port}",
     ]
 
     await hypercorn.asyncio.serve(
@@ -150,24 +130,14 @@ async def serve_http() -> None:
     )
 
 
-
 async def run() -> None:
-    """
-    Run HTTP and gRPC servers together.
-    """
-
     await asyncio.gather(
         serve_grpc(),
         serve_http(),
     )
 
 
-
 def main() -> None:
-    """
-    Service entrypoint.
-    """
-
     asyncio.run(run())
 
 

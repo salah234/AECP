@@ -1,13 +1,41 @@
 """gRPC servicer implementation for aecp.state.v1.StateService."""
 
 from __future__ import annotations
-import grpc.aio 
-from state.app.decision_log import DecisionLogEntry
-from state.app.drift import DriftReport
-from app.state.v1 import state_pb2, state_pb2_grpc
-from state.app.interceptors import AllowListInterceptor
+
+from dataclasses import dataclass
+from pathlib import Path
 from uuid import uuid4
 
+import grpc
+import grpc.aio
+from grpc_reflection.v1alpha import reflection
+
+from app.common.v1 import common_pb2
+from app.decision_log import DecisionLogEntry
+from app.drift import DriftReport
+from app.state.v1 import state_pb2, state_pb2_grpc
+from app.interceptors import AllowListInterceptor
+
+
+@dataclass(frozen=True)
+class MTLSConfig:
+    certificate_chain: bytes
+    private_key: bytes
+    ca_certificate: bytes
+
+    @classmethod
+    def from_files(
+        cls,
+        *,
+        cert_file: str,
+        key_file: str,
+        ca_file: str,
+    ) -> "MTLSConfig":
+        return cls(
+            certificate_chain=Path(cert_file).read_bytes(),
+            private_key=Path(key_file).read_bytes(),
+            ca_certificate=Path(ca_file).read_bytes(),
+        )
 
 
 class StateServicer:
@@ -22,30 +50,30 @@ class StateServicer:
         self.drift_detector = drift_detector
 
     async def RecordDecision(self, request, context):
+        request_entry = request.entry
         entry = DecisionLogEntry(
-            entry_id=request.entry_id,
-            tenant_id=request.tenant_id,
-            task_id=request.task_id,
-            summary=request.summary,
-            rationale=request.rationale,
-            decided_by_kind=request.decided_by_kind,
-            decided_by_id=request.decided_by_id,
-            decided_at=request.decided_at,
-            supersedes_entry_id=request.supersedes_entry_id or None,
+            entry_id=request_entry.entry_id,
+            tenant_id=request_entry.tenant_id,
+            task_id=request_entry.task_id,
+            summary=request_entry.summary,
+            rationale=request_entry.rationale,
+            decided_by_kind=common_pb2.Actor.Kind.Name(
+                request_entry.decided_by.kind,
+            ),
+            decided_by_id=request_entry.decided_by.id,
+            decided_at=request_entry.decided_at.ToDatetime(),
         )
         await self.decision_log.record(entry)
 
         proto_entry = state_pb2.DecisionLogEntry(
-                entry_id=entry.entry_id,
-                tenant_id=entry.tenant_id,
-                task_id=entry.task_id,
-                summary=entry.summary,
-                rationale=entry.rationale,
-                decided_by_kind=entry.decided_by_kind,
-                decided_by_id=entry.decided_by_id,
-                decided_at=entry.decided_at,
-                supersedes_entry_id=entry.supersedes_entry_id or "",
+            entry_id=entry.entry_id,
+            tenant_id=entry.tenant_id,
+            task_id=entry.task_id,
+            summary=entry.summary,
+            rationale=entry.rationale,
+            decided_by=request_entry.decided_by,
         )
+        proto_entry.decided_at.FromDatetime(entry.decided_at)
 
         return state_pb2.RecordDecisionResponse(
             entry=proto_entry
@@ -60,17 +88,15 @@ class StateServicer:
             await context.abort(grpc.StatusCode.NOT_FOUND,
                                 "Ownership not found")
         
-        return state_pb2.GetOwnershipResponse(
-            record=state_pb2.OwnershipRecord(
-                tenant_id=ownership_record.tenant_id,
-                module_path=ownership_record.module_path,
-                last_task_id=ownership_record.last_task_id,
-                last_agent_id=ownership_record.last_agent_id,
-                last_touched_at=ownership_record.last_touched_at.isoformat()
-
-            )
-
+        proto_record = state_pb2.OwnershipRecord(
+            tenant_id=ownership_record.tenant_id,
+            module_path=ownership_record.module_path,
+            last_task_id=ownership_record.last_task_id,
+            last_agent_id=ownership_record.last_agent_id,
         )
+        proto_record.last_touched_at.FromDatetime(ownership_record.last_touched_at)
+
+        return state_pb2.GetOwnershipResponse(record=proto_record)
 
 
     async def GetInterfaceContract(self, request, context):
@@ -97,12 +123,13 @@ class StateServicer:
 
 
     async def ReportDrift(self, request, context):
+        request_report = request.report
         drift = DriftReport(
-            report_id=str(uuid4()),
-            tenant_id=request.tenant_id,
-            contract_id=request.contract_id,
-            description=request.description,
-            resolved=False
+            report_id=request_report.report_id or str(uuid4()),
+            tenant_id=request_report.tenant_id,
+            contract_id=request_report.contract_id,
+            description=request_report.description,
+            resolved=request_report.resolved,
         )
         await self.drift_detector.report(drift)
         proto_drift = state_pb2.DriftReport(
@@ -117,13 +144,23 @@ class StateServicer:
         )
 
 
-def build_server(servicer: StateServicer, mtls_config, allow_list):
+def build_server(
+    servicer: StateServicer,
+    *,
+    mtls_cert_file: str,
+    mtls_key_file: str,
+    mtls_ca_file: str,
+    allow_list: list[str] | tuple[str, ...],
+    port: int = 50051,
+):
     """Construct a grpc.aio.Server bound to the given servicer, with the
     mTLS server credentials and caller allow-list interceptor applied.
     """
+ 
+
     server = grpc.aio.server(
         interceptors=[
-            AllowListInterceptor(allow_list) # RPC Interceptor since its impacting multiple layers/modules in an application - Middleware
+            AllowListInterceptor(allow_list)
         ]
     )
 
@@ -131,21 +168,40 @@ def build_server(servicer: StateServicer, mtls_config, allow_list):
         servicer,
         server,
     )
-
-    credentials = grpc.ssl_server_credentials(
-        [
-            (
-                mtls_config.private_key,
-                mtls_config.certificate_chain,
-            ),
-        ],
-        root_certificates=mtls_config.ca_certificate,
-        require_client_auth=True,
+    SERVICE_NAMES = (
+    state_pb2.DESCRIPTOR.services_by_name["StateService"].full_name,
+    reflection.SERVICE_NAME,
     )
 
-    server.add_secure_port(
-        "[::]:50051",
-        credentials,
+    reflection.enable_server_reflection(
+        SERVICE_NAMES,
+        server,
     )
+    if mtls_cert_file and mtls_ca_file and mtls_key_file:
+        mtls_config = MTLSConfig.from_files(
+        cert_file=mtls_cert_file,
+        key_file=mtls_key_file,
+        ca_file=mtls_ca_file,
+        )
+
+        credentials = grpc.ssl_server_credentials(
+            [
+                (
+                    mtls_config.private_key,
+                    mtls_config.certificate_chain,
+                ),
+            ],
+            root_certificates=mtls_config.ca_certificate,
+            require_client_auth=True,
+        )
+
+        server.add_secure_port(
+            f"[::]:{port}",
+            credentials,
+        )
+    else:
+        server.add_insecure_port(
+            f"[::]:{port}",
+        )
 
     return server

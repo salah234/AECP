@@ -12,6 +12,8 @@ dependencies = [
     "asyncpg>=0.30",
     "pydantic>=2.9",
     "hypercorn",
+    "python-dotenv>=1.2.2",
+    "grpcio-reflection>=1.68",
 ]
 
 [tool.uv.sources]

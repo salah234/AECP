@@ -1,13 +1,14 @@
-version: v2
+
 # Generates Python (grpcio) stubs consumed by every backend service, and
 # TypeScript stubs consumed by the dashboard via gRPC-web through the
 # gateway. Run `make proto-gen` (see root Makefile) rather than invoking
 # buf directly, so generated output always lands in the right per-language
 # directories.
+version: v2
+
 plugins:
   - remote: buf.build/protocolbuffers/python
-    out: gen/python
+    out: ../state/app
+
   - remote: buf.build/grpc/python
-    out: gen/python
-  - remote: buf.build/protocolbuffers/es
-    out: gen/typescript
+    out: ../state/app
