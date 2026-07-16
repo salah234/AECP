@@ -27,7 +27,7 @@ _current_tenant: contextvars.ContextVar[TenantID] = contextvars.ContextVar("aecp
 
 def bind_tenant(tenant: TenantID) -> contextvars.Token:
     """Bind a tenant to the current context for the remainder of a request."""
-    raise NotImplementedError
+    return _current_tenant.set(tenant)
 
 
 def current_tenant() -> TenantID:
@@ -35,7 +35,7 @@ def current_tenant() -> TenantID:
 
     Raises if none is set — there is deliberately no default tenant.
     """
-    raise NotImplementedError
+    return _current_tenant.get()
 
 
 class TenantScopedPool:
@@ -47,7 +47,7 @@ class TenantScopedPool:
     """
 
     def __init__(self, pool) -> None:
-        raise NotImplementedError
+        self._pool = pool
 
     @asynccontextmanager
     async def transaction(self) -> AsyncIterator[object]:
@@ -57,5 +57,9 @@ class TenantScopedPool:
         set_config(..., is_local=true)) so the RLS context cannot leak
         across pooled-connection reuse.
         """
-        raise NotImplementedError
-        yield  # pragma: no cover - placeholder to keep this a generator
+        tenant = current_tenant()
+
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute("SELECT set_config('app.tenant_id', $1, true)", tenant)
+                yield conn

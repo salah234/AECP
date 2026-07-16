@@ -14,19 +14,26 @@ from .schema import RiskTier
 # set one. Filled in during implementation per CLAUDE.md's table.
 DEFAULT_RISK_TIER: RiskTier | None = None
 
+RISK_ORDER = {
+    RiskTier.MECHANICAL: 0,
+    RiskTier.LOCAL: 1,
+    RiskTier.STRUCTURAL: 2,
+    RiskTier.ARCHITECTURAL: 3,
+}
 
 def requires_human_approval(tier: RiskTier) -> bool:
     """Return whether merging a task at this tier requires human approval
     before merge (tiers STRUCTURAL and ARCHITECTURAL).
     """
-    raise NotImplementedError
+    return tier in (RiskTier.STRUCTURAL, RiskTier.ARCHITECTURAL)
+    
 
 
 def can_auto_merge(tier: RiskTier) -> bool:
     """Return whether a task at this tier can auto-merge on green CI
     (tier MECHANICAL only).
     """
-    raise NotImplementedError
+    return tier in (RiskTier.MECHANICAL)
 
 
 def is_valid_escalation(current: RiskTier, requested: RiskTier) -> bool:
@@ -34,4 +41,5 @@ def is_valid_escalation(current: RiskTier, requested: RiskTier) -> bool:
     escalation direction (escalations only ever increase tier; an agent
     must halt and re-escalate rather than downgrade itself).
     """
-    raise NotImplementedError
+
+    return RISK_ORDER[current] <= RISK_ORDER[requested]

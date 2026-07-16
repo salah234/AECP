@@ -8,8 +8,10 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "grpcio>=1.68",
+    "grpcio-reflection>=1.68",
     "asyncpg>=0.30",
     "pydantic>=2.9",
+    "python-dotenv>=1.0.0",
 ]
 
 [tool.uv.sources]
@@ -24,3 +26,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

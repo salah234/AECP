@@ -12,3 +12,9 @@ plugins:
 
   - remote: buf.build/grpc/python
     out: ../state/app
+
+  - remote: buf.build/protocolbuffers/python
+    out: ../taskgraph/app
+
+  - remote: buf.build/grpc/python
+    out: ../taskgraph/app
