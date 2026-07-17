@@ -20,6 +20,10 @@ enum AgentSessionStatus {
 // knowledge lives in the State Layer, never in a session's own scratch
 // context, so a dead/timed-out session can be resumed by a different
 // instance with no loss of continuity.
+//
+// ownership and task_node_snapshot are captured verbatim from the
+// SpawnSessionRequest that created this session (see below) so a
+// handoff-spawned replacement session never has to re-derive them.
 message AgentSession {
   string session_id = 1;
   string tenant_id = 2;
@@ -28,12 +32,28 @@ message AgentSession {
   aecp.common.v1.RiskTier granted_risk_tier = 5;
   google.protobuf.Timestamp spawned_at = 6;
   google.protobuf.Timestamp expires_at = 7;
+  aecp.common.v1.OwnershipBoundary ownership = 8;
+  bytes task_node_snapshot = 9;
 }
 
+// ownership and task_node_snapshot are supplied by the Coordinator, which
+// already called TaskGraphService to make the assignment decision, rather
+// than looked up by Agent Pool itself: Agent Pool has no network path to
+// TaskGraph by design (deploy/k8s/networkpolicy/agents-edges.yaml permits
+// only Coordinator and State), so it must never need to ask TaskGraph
+// "what does this task look like?" any more than an agent session should
+// ask "did someone else already do this?" by inspecting another agent's
+// work directly. See docs/adr/0007-agent-pool-has-no-taskgraph-edge.md.
 message SpawnSessionRequest {
   string tenant_id = 1;
   string task_id = 2;
   aecp.common.v1.RiskTier granted_risk_tier = 3;
+  aecp.common.v1.OwnershipBoundary ownership = 4;
+  // Opaque, Coordinator-forwarded serialization of taskgraph.v1.TaskNode.
+  // Agent Pool treats this as a blob to hand back verbatim in
+  // HydrateContextResponse; it does not parse it or depend on
+  // taskgraph_pb2 to do so.
+  bytes task_node_snapshot = 5;
 }
 
 message SpawnSessionResponse {
@@ -42,6 +62,25 @@ message SpawnSessionResponse {
 
 message HydrateContextRequest {
   string session_id = 1;
+}
+
+// ContextBundle is the typed wire format serialized into
+// HydrateContextResponse.context_bundle. task_node and ownership_boundary
+// are opaque bytes (verbatim copies of what SpawnSessionRequest carried,
+// see docs/adr/0007-agent-pool-has-no-taskgraph-edge.md) rather than
+// structured TaskNode/OwnershipBoundary fields, since Agent Pool never
+// parses task_node itself — it only ever hands it back to the session
+// that owns it.
+message ContextBundle {
+  string task_id = 1;
+  bytes task_node = 2;
+  bytes ownership_boundary = 3;
+  // Empty until proto/state/v1/state.proto grows a query-by-task/module
+  // RPC for interface contracts and decision log entries — StateService
+  // today only exposes exact-id GetInterfaceContract and a write-only
+  // RecordDecision. See agents/app/hydration.py.
+  repeated bytes relevant_interface_contracts = 4;
+  repeated bytes relevant_decision_log_entries = 5;
 }
 
 // HydrateContextResponse carries only what the State Layer says this

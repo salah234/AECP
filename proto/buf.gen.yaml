@@ -18,3 +18,12 @@ plugins:
 
   - remote: buf.build/grpc/python
     out: ../taskgraph/app
+
+  - remote: buf.build/protocolbuffers/python
+    out: ../agents/app
+
+  - remote: buf.build/grpc/python
+    out: ../agents/app
+
+  - remote: buf.build/protocolbuffers/pyi
+    out: ../agents/app

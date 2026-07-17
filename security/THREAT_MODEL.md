@@ -64,5 +64,25 @@ Coordinator ── mediates ALL cross-service and cross-agent coordination
 - Agent sandbox concrete implementation (`agents/app/sandbox.py`) is not
   yet chosen (gVisor/Firecracker/container-only) — this is a Tier 3
   decision and needs its own ADR before implementation starts.
+  `agents/app/sandbox.py`'s current `Sandbox` class is explicitly a
+  non-isolating dev/test placeholder (scratch directory only, no process/
+  filesystem/network isolation) so the rest of Agent Pool (spawn,
+  handoff, teardown, capacity accounting) could be implemented and tested
+  end-to-end without blocking on this decision. Do not treat it as a
+  security boundary; it is load-bearing for nothing in this table.
+- Agent session credentials (`agents/app/identity.py`) are HMAC-signed
+  opaque tokens, not real mTLS client certificates — an interim scheme
+  pending `platform/aecp_platform/identity.py` (Tier 3, owned by
+  /platform). Same caveat as `AllowListInterceptor` below: acceptable for
+  now, not the final mechanism.
+- The application-layer mitigation for threat #2
+  (`platform/aecp_platform/identity.AllowList`) is not yet implemented.
+  Every service that has a gRPC server today (`taskgraph`, `state`,
+  `agents`) instead uses its own local, metadata-based
+  `AllowListInterceptor` (caller-supplied `caller-id`, not a verified mTLS
+  peer identity) as an interim placeholder — see
+  `agents/app/interceptors.py`. The network-layer mitigation
+  (`deploy/k8s/networkpolicy/`) is real and enforced independently, so
+  defense in depth is partial, not absent, until `AllowList` lands.
 - Secrets backend (KMS vs Vault) is not yet chosen — see
   `docs/adr/0006-secrets-management.md`.

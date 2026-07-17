@@ -8,14 +8,25 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "grpcio>=1.68",
+    "grpcio-reflection>=1.68",
+    "protobuf>=5.29",
     "pydantic>=2.9",
+    "python-dotenv>=1.0.0",
 ]
 
 [tool.uv.sources]
 aecp-platform = { path = "../platform", editable = true }
 
 [dependency-groups]
-dev = ["ruff>=0.7", "mypy>=1.13", "pytest>=8.3", "pytest-asyncio>=0.24"]
+dev = [
+    "ruff>=0.7",
+    "mypy>=1.13",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "types-protobuf>=5.29",
+    "types-grpcio>=1.68",
+    "types-grpcio-reflection>=1.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -23,3 +34,31 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.ruff]
+# Generated code ("DO NOT EDIT" per protoc/buf) is not hand-maintained
+# and shouldn't be lint-gated; only app/*_pb2.py-adjacent packages match
+# this, never hand-written modules.
+extend-exclude = [
+    "app/agents/v1",
+    "app/common/v1",
+    "app/coordinator/v1",
+    "app/integration/v1",
+    "app/observability/v1",
+    "app/state/v1",
+    "app/taskgraph/v1",
+]
+
+[tool.mypy]
+exclude = [
+    "app/agents/v1",
+    "app/common/v1",
+    "app/coordinator/v1",
+    "app/integration/v1",
+    "app/observability/v1",
+    "app/state/v1",
+    "app/taskgraph/v1",
+]
