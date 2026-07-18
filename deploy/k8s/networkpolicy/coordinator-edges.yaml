@@ -29,6 +29,7 @@ spec:
         - podSelector: { matchLabels: { app.kubernetes.io/component: state } }
         - podSelector: { matchLabels: { app.kubernetes.io/component: agents } }
         - podSelector: { matchLabels: { app.kubernetes.io/component: observability } }
+        - podSelector: { matchLabels: { app.kubernetes.io/component: integration } }
     - ports:
         - port: 53
           protocol: UDP

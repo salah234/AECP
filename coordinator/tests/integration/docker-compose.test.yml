@@ -1,0 +1,124 @@
+version: "3.9"
+
+# Throwaway topology for coordinator's end-to-end integration test
+# (test_e2e_docker_compose.py). Boots real postgres + taskgraph + state +
+# agents + coordinator containers over a real Docker network and talks to
+# them over real gRPC — no fakes, no mocks. Distinct from
+# deploy/docker/docker-compose.yml (the full local-dev topology): this
+# intentionally omits integration/observability/gateway/dashboard, whose
+# own servicers are still unimplemented stubs that would crash on boot,
+# and skips the shared root .env in favor of explicit inline environment
+# blocks so this test never depends on (or risks reading) developer
+# secrets in that file.
+#
+# Run via: docker compose -f coordinator/tests/integration/docker-compose.test.yml up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: aecp
+      POSTGRES_PASSWORD: aecp_dev_only
+      POSTGRES_DB: aecp
+    ports: ["55432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aecp"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    networks: [aecp-test]
+
+  taskgraph:
+    build:
+      context: ../../..
+      dockerfile: taskgraph/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TASKGRAPH_GRPC_PORT: "50052"
+      GATEWAY_HTTP_PORT: "8080"
+      POSTGRES_DSN: "postgresql://aecp:aecp_dev_only@postgres:5432/aecp"
+      OTEL_COLLECTOR_ENDPOINT: "otel-collector:4317"
+      ALLOWED_CALLERS: "coordinator"
+      MTLS_CERT_FILE: ""
+      MTLS_KEY_FILE: ""
+      MTLS_CA_FILE: ""
+    ports: ["55052:50052", "58080:8080"]
+    networks: [aecp-test]
+
+  state:
+    build:
+      context: ../../..
+      dockerfile: state/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      GRPC_PORT: "50051"
+      HTTP_PORT: "8080"
+      POSTGRES_DSN: "postgresql://aecp:aecp_dev_only@postgres:5432/aecp"
+      OBJECT_STORAGE_BUCKET: "/tmp/aecp-state-artifacts"
+      OTEL_COLLECTOR_ENDPOINT: "otel-collector:4317"
+      ALLOWED_CALLERS: "coordinator,agents"
+      MTLS_CERT_FILE: ""
+      MTLS_KEY_FILE: ""
+      MTLS_CA_FILE: ""
+    ports: ["55051:50051"]
+    networks: [aecp-test]
+
+  agents:
+    build:
+      context: ../../..
+      dockerfile: agents/Dockerfile
+    depends_on: [state, coordinator]
+    environment:
+      AGENTS_GRPC_PORT: "50053"
+      AGENTS_HTTP_PORT: "8080"
+      STATE_ADDR: "state:50051"
+      COORDINATOR_ADDR: "coordinator:50054"
+      SESSION_TTL_SECONDS: "3600"
+      SANDBOX_IMAGE: "unused-in-test"
+      OTEL_COLLECTOR_ENDPOINT: "otel-collector:4317"
+      ALLOWED_CALLERS: "coordinator"
+      MTLS_CERT_FILE: ""
+      MTLS_KEY_FILE: ""
+      MTLS_CA_FILE: ""
+    ports: ["55053:50053"]
+    networks: [aecp-test]
+
+  coordinator:
+    build:
+      context: ../../..
+      dockerfile: coordinator/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      taskgraph:
+        condition: service_started
+      state:
+        condition: service_started
+    environment:
+      COORDINATOR_GRPC_PORT: "50054"
+      COORDINATOR_HTTP_PORT: "8080"
+      POSTGRES_DSN: "postgresql://aecp:aecp_dev_only@postgres:5432/aecp"
+      TASKGRAPH_ADDR: "taskgraph:50052"
+      STATE_ADDR: "state:50051"
+      AGENTS_ADDR: "agents:50053"
+      # No integration/observability containers in this topology — both
+      # addresses are intentionally unreachable so IntegrationClient /
+      # AuditClient exercise their real, documented graceful-degradation
+      # path (transport failure -> logged warning, not a crash).
+      INTEGRATION_ADDR: "integration:50055"
+      OBSERVABILITY_ADDR: "observability:50056"
+      OTEL_COLLECTOR_ENDPOINT: "otel-collector:4317"
+      ALLOWED_CALLERS: "agents,gateway,test-client"
+      MTLS_CERT_FILE: ""
+      MTLS_KEY_FILE: ""
+      MTLS_CA_FILE: ""
+    ports: ["55054:50054", "58081:8080"]
+    networks: [aecp-test]
+
+networks:
+  aecp-test:
+    driver: bridge

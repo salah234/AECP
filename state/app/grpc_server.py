@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import grpc
 import grpc.aio
+from aecp_platform.dbtenant import TenantID, bind_tenant
 from grpc_reflection.v1alpha import reflection
 
 from app.common.v1 import common_pb2
@@ -51,6 +52,7 @@ class StateServicer:
 
     async def RecordDecision(self, request, context):
         request_entry = request.entry
+        bind_tenant(TenantID(request_entry.tenant_id))
         entry = DecisionLogEntry(
             entry_id=request_entry.entry_id,
             tenant_id=request_entry.tenant_id,
@@ -80,6 +82,7 @@ class StateServicer:
         )
         
     async def GetOwnership(self, request, context):
+        bind_tenant(TenantID(request.tenant_id))
         ownership_record = await self.ownership_map.get(
             request.tenant_id,
             request.module_path
@@ -100,6 +103,13 @@ class StateServicer:
 
 
     async def GetInterfaceContract(self, request, context):
+        # NOTE(tenancy): GetInterfaceContractRequest carries no tenant_id, so
+        # there is nothing to bind_tenant() with here — same gap documented
+        # in taskgraph/app/grpc_server.py for GetTaskNode et al. This call
+        # will fail closed with a "no tenant bound" error against a real
+        # TenantScopedPool until the proto contract grows a tenant_id field,
+        # rather than silently running unscoped against interface_contracts'
+        # RLS-protected rows.
         interface_contract = await self.contract_registry.get(
             request.contract_id
         )
@@ -124,6 +134,7 @@ class StateServicer:
 
     async def ReportDrift(self, request, context):
         request_report = request.report
+        bind_tenant(TenantID(request_report.tenant_id))
         drift = DriftReport(
             report_id=request_report.report_id or str(uuid4()),
             tenant_id=request_report.tenant_id,

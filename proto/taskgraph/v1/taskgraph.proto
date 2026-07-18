@@ -43,6 +43,11 @@ message CreateTaskNodeResponse {
 
 message GetTaskNodeRequest {
   string task_id = 1;
+  // Required so the server can bind_tenant() before querying the
+  // TenantScopedPool-backed repository — a query issued without a bound
+  // tenant fails closed rather than running unscoped. See
+  // aecp_platform.dbtenant and CLAUDE.md's Postgres RLS convention.
+  string tenant_id = 2;
 }
 
 message GetTaskNodeResponse {
@@ -53,6 +58,7 @@ message UpdateTaskStatusRequest {
   string task_id = 1;
   aecp.common.v1.TaskStatus status = 2;
   string reason = 3;
+  string tenant_id = 4; // see GetTaskNodeRequest.tenant_id
 }
 
 message UpdateTaskStatusResponse {
@@ -71,6 +77,7 @@ message ListReadyTaskNodesResponse {
 message ValidateOwnershipRequest {
   string task_id = 1;
   repeated string changed_paths = 2;
+  string tenant_id = 3; // see GetTaskNodeRequest.tenant_id
 }
 
 message ValidateOwnershipResponse {

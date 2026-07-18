@@ -27,3 +27,9 @@ plugins:
 
   - remote: buf.build/protocolbuffers/pyi
     out: ../agents/app
+
+  - remote: buf.build/protocolbuffers/python
+    out: ../coordinator/app
+
+  - remote: buf.build/grpc/python
+    out: ../coordinator/app

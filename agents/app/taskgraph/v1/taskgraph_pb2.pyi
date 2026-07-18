@@ -63,10 +63,12 @@ class CreateTaskNodeResponse(_message.Message):
     def __init__(self, node: _Optional[_Union[TaskNode, _Mapping]] = ...) -> None: ...
 
 class GetTaskNodeRequest(_message.Message):
-    __slots__ = ("task_id",)
+    __slots__ = ("task_id", "tenant_id")
     TASK_ID_FIELD_NUMBER: _ClassVar[int]
+    TENANT_ID_FIELD_NUMBER: _ClassVar[int]
     task_id: str
-    def __init__(self, task_id: _Optional[str] = ...) -> None: ...
+    tenant_id: str
+    def __init__(self, task_id: _Optional[str] = ..., tenant_id: _Optional[str] = ...) -> None: ...
 
 class GetTaskNodeResponse(_message.Message):
     __slots__ = ("node",)
@@ -75,14 +77,16 @@ class GetTaskNodeResponse(_message.Message):
     def __init__(self, node: _Optional[_Union[TaskNode, _Mapping]] = ...) -> None: ...
 
 class UpdateTaskStatusRequest(_message.Message):
-    __slots__ = ("task_id", "status", "reason")
+    __slots__ = ("task_id", "status", "reason", "tenant_id")
     TASK_ID_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     REASON_FIELD_NUMBER: _ClassVar[int]
+    TENANT_ID_FIELD_NUMBER: _ClassVar[int]
     task_id: str
     status: _common_pb2.TaskStatus
     reason: str
-    def __init__(self, task_id: _Optional[str] = ..., status: _Optional[_Union[_common_pb2.TaskStatus, str]] = ..., reason: _Optional[str] = ...) -> None: ...
+    tenant_id: str
+    def __init__(self, task_id: _Optional[str] = ..., status: _Optional[_Union[_common_pb2.TaskStatus, str]] = ..., reason: _Optional[str] = ..., tenant_id: _Optional[str] = ...) -> None: ...
 
 class UpdateTaskStatusResponse(_message.Message):
     __slots__ = ("node",)
@@ -103,12 +107,14 @@ class ListReadyTaskNodesResponse(_message.Message):
     def __init__(self, nodes: _Optional[_Iterable[_Union[TaskNode, _Mapping]]] = ...) -> None: ...
 
 class ValidateOwnershipRequest(_message.Message):
-    __slots__ = ("task_id", "changed_paths")
+    __slots__ = ("task_id", "changed_paths", "tenant_id")
     TASK_ID_FIELD_NUMBER: _ClassVar[int]
     CHANGED_PATHS_FIELD_NUMBER: _ClassVar[int]
+    TENANT_ID_FIELD_NUMBER: _ClassVar[int]
     task_id: str
     changed_paths: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, task_id: _Optional[str] = ..., changed_paths: _Optional[_Iterable[str]] = ...) -> None: ...
+    tenant_id: str
+    def __init__(self, task_id: _Optional[str] = ..., changed_paths: _Optional[_Iterable[str]] = ..., tenant_id: _Optional[str] = ...) -> None: ...
 
 class ValidateOwnershipResponse(_message.Message):
     __slots__ = ("within_boundary", "violating_paths")

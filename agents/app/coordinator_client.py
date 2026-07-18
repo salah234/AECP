@@ -26,11 +26,14 @@ class CoordinatorClient:
         self._metadata = caller_metadata(caller_id)
 
     async def report_blocker(
-        self, *, task_id: str, agent_id: str, description: str
+        self, *, task_id: str, tenant_id: str, agent_id: str, description: str
     ) -> bool:
         response = await self._stub.ReportBlocker(
             coordinator_pb2.ReportBlockerRequest(
-                task_id=task_id, agent_id=agent_id, description=description
+                task_id=task_id,
+                tenant_id=tenant_id,
+                agent_id=agent_id,
+                description=description,
             ),
             metadata=self._metadata,
         )

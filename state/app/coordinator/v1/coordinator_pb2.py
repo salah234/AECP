@@ -26,7 +26,7 @@ from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__
 from app.common.v1 import common_pb2 as common_dot_v1_dot_common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n coordinator/v1/coordinator.proto\x12\x13\x61\x65\x63p.coordinator.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16\x63ommon/v1/common.proto\"I\n\x11\x41ssignmentRequest\x12\x17\n\x07task_id\x18\x01 \x01(\tR\x06taskId\x12\x1b\n\ttenant_id\x18\x02 \x01(\tR\x08tenantId\"\xac\x01\n\x12\x41ssignmentDecision\x12\x17\n\x07task_id\x18\x01 \x01(\tR\x06taskId\x12\x19\n\x08\x61gent_id\x18\x02 \x01(\tR\x07\x61gentId\x12\x44\n\x11granted_risk_tier\x18\x03 \x01(\x0e\x32\x18.aecp.common.v1.RiskTierR\x0fgrantedRiskTier\x12\x1c\n\trationale\x18\x04 \x01(\tR\trationale\".\n\x0fScheduleRequest\x12\x1b\n\ttenant_id\x18\x01 \x01(\tR\x08tenantId\"Y\n\x10ScheduleResponse\x12\x45\n\tdecisions\x18\x01 \x03(\x0b\x32\'.aecp.coordinator.v1.AssignmentDecisionR\tdecisions\"\xa7\x01\n\x0f\x45scalateRequest\x12\x17\n\x07task_id\x18\x01 \x01(\tR\x06taskId\x12\x19\n\x08\x61gent_id\x18\x02 \x01(\tR\x07\x61gentId\x12\x16\n\x06reason\x18\x03 \x01(\tR\x06reason\x12H\n\x13requested_risk_tier\x18\x04 \x01(\x0e\x32\x18.aecp.common.v1.RiskTierR\x11requestedRiskTier\"M\n\x10\x45scalateResponse\x12\x1a\n\x08\x61pproved\x18\x01 \x01(\x08R\x08\x61pproved\x12\x1d\n\ndecided_by\x18\x02 \x01(\tR\tdecidedBy\"l\n\x14ReportBlockerRequest\x12\x17\n\x07task_id\x18\x01 \x01(\tR\x06taskId\x12\x19\n\x08\x61gent_id\x18\x02 \x01(\tR\x07\x61gentId\x12 \n\x0b\x64\x65scription\x18\x03 \x01(\tR\x0b\x64\x65scription\";\n\x15ReportBlockerResponse\x12\"\n\x0c\x61\x63knowledged\x18\x01 \x01(\x08R\x0c\x61\x63knowledged2\xae\x02\n\x12\x43oordinatorService\x12W\n\x08Schedule\x12$.aecp.coordinator.v1.ScheduleRequest\x1a%.aecp.coordinator.v1.ScheduleResponse\x12W\n\x08\x45scalate\x12$.aecp.coordinator.v1.EscalateRequest\x1a%.aecp.coordinator.v1.EscalateResponse\x12\x66\n\rReportBlocker\x12).aecp.coordinator.v1.ReportBlockerRequest\x1a*.aecp.coordinator.v1.ReportBlockerResponseB)Z\'aecp/proto/coordinator/v1;coordinatorv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n coordinator/v1/coordinator.proto\x12\x13\x61\x65\x63p.coordinator.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16\x63ommon/v1/common.proto\"I\n\x11\x41ssignmentRequest\x12\x17\n\x07task_id\x18\x01 \x01(\tR\x06taskId\x12\x1b\n\ttenant_id\x18\x02 \x01(\tR\x08tenantId\"\xac\x01\n\x12\x41ssignmentDecision\x12\x17\n\x07task_id\x18\x01 \x01(\tR\x06taskId\x12\x19\n\x08\x61gent_id\x18\x02 \x01(\tR\x07\x61gentId\x12\x44\n\x11granted_risk_tier\x18\x03 \x01(\x0e\x32\x18.aecp.common.v1.RiskTierR\x0fgrantedRiskTier\x12\x1c\n\trationale\x18\x04 \x01(\tR\trationale\".\n\x0fScheduleRequest\x12\x1b\n\ttenant_id\x18\x01 \x01(\tR\x08tenantId\"Y\n\x10ScheduleResponse\x12\x45\n\tdecisions\x18\x01 \x03(\x0b\x32\'.aecp.coordinator.v1.AssignmentDecisionR\tdecisions\"\xc4\x01\n\x0f\x45scalateRequest\x12\x17\n\x07task_id\x18\x01 \x01(\tR\x06taskId\x12\x19\n\x08\x61gent_id\x18\x02 \x01(\tR\x07\x61gentId\x12\x16\n\x06reason\x18\x03 \x01(\tR\x06reason\x12H\n\x13requested_risk_tier\x18\x04 \x01(\x0e\x32\x18.aecp.common.v1.RiskTierR\x11requestedRiskTier\x12\x1b\n\ttenant_id\x18\x05 \x01(\tR\x08tenantId\"M\n\x10\x45scalateResponse\x12\x1a\n\x08\x61pproved\x18\x01 \x01(\x08R\x08\x61pproved\x12\x1d\n\ndecided_by\x18\x02 \x01(\tR\tdecidedBy\"\x89\x01\n\x14ReportBlockerRequest\x12\x17\n\x07task_id\x18\x01 \x01(\tR\x06taskId\x12\x19\n\x08\x61gent_id\x18\x02 \x01(\tR\x07\x61gentId\x12 \n\x0b\x64\x65scription\x18\x03 \x01(\tR\x0b\x64\x65scription\x12\x1b\n\ttenant_id\x18\x04 \x01(\tR\x08tenantId\";\n\x15ReportBlockerResponse\x12\"\n\x0c\x61\x63knowledged\x18\x01 \x01(\x08R\x0c\x61\x63knowledged2\xae\x02\n\x12\x43oordinatorService\x12W\n\x08Schedule\x12$.aecp.coordinator.v1.ScheduleRequest\x1a%.aecp.coordinator.v1.ScheduleResponse\x12W\n\x08\x45scalate\x12$.aecp.coordinator.v1.EscalateRequest\x1a%.aecp.coordinator.v1.EscalateResponse\x12\x66\n\rReportBlocker\x12).aecp.coordinator.v1.ReportBlockerRequest\x1a*.aecp.coordinator.v1.ReportBlockerResponseB)Z\'aecp/proto/coordinator/v1;coordinatorv1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -43,13 +43,13 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_SCHEDULERESPONSE']._serialized_start=412
   _globals['_SCHEDULERESPONSE']._serialized_end=501
   _globals['_ESCALATEREQUEST']._serialized_start=504
-  _globals['_ESCALATEREQUEST']._serialized_end=671
-  _globals['_ESCALATERESPONSE']._serialized_start=673
-  _globals['_ESCALATERESPONSE']._serialized_end=750
-  _globals['_REPORTBLOCKERREQUEST']._serialized_start=752
-  _globals['_REPORTBLOCKERREQUEST']._serialized_end=860
-  _globals['_REPORTBLOCKERRESPONSE']._serialized_start=862
-  _globals['_REPORTBLOCKERRESPONSE']._serialized_end=921
-  _globals['_COORDINATORSERVICE']._serialized_start=924
-  _globals['_COORDINATORSERVICE']._serialized_end=1226
+  _globals['_ESCALATEREQUEST']._serialized_end=700
+  _globals['_ESCALATERESPONSE']._serialized_start=702
+  _globals['_ESCALATERESPONSE']._serialized_end=779
+  _globals['_REPORTBLOCKERREQUEST']._serialized_start=782
+  _globals['_REPORTBLOCKERREQUEST']._serialized_end=919
+  _globals['_REPORTBLOCKERRESPONSE']._serialized_start=921
+  _globals['_REPORTBLOCKERRESPONSE']._serialized_end=980
+  _globals['_COORDINATORSERVICE']._serialized_start=983
+  _globals['_COORDINATORSERVICE']._serialized_end=1285
 # @@protoc_insertion_point(module_scope)

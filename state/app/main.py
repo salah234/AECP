@@ -6,6 +6,7 @@ import asyncio
 
 import asyncpg
 import hypercorn.asyncio
+from aecp_platform.dbtenant import TenantScopedPool
 from fastapi import FastAPI
 from hypercorn.config import Config
 
@@ -66,7 +67,7 @@ async def serve_grpc() -> None:
     )
 
     repository = StateRepository(
-        pool=pool,
+        pool=TenantScopedPool(pool),
         object_storage_client=object_storage,
     )
 

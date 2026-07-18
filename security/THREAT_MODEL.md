@@ -16,6 +16,9 @@ Gateway  ── only component reachable from outside the cluster network
 Coordinator ── mediates ALL cross-service and cross-agent coordination
    │
    ├── TaskGraph ── State ── Integration ── Observability
+   │        (Coordinator also has a direct edge to Integration —
+   │         deploy/k8s/networkpolicy/coordinator-edges.yaml — to call
+   │         DetectConflicts before finalizing a schedule tick)
    │
    └── Agent Pool
           │  (mTLS, per-session scoped credential, sandboxed execution)
@@ -29,7 +32,7 @@ Coordinator ── mediates ALL cross-service and cross-agent coordination
 |---|---|---|---|
 | Human user (EM/reviewer) | OIDC via Gateway | Gateway REST API, scoped to their tenant | Any internal gRPC service directly |
 | Agent session | Short-lived scoped credential from Agent Pool | Coordinator, State (read-scoped to its own task) | TaskGraph, Integration, Observability, Gateway, **other agent sessions** |
-| Coordinator | mTLS service identity | TaskGraph, State, Agent Pool, Observability | — (it is the hub) |
+| Coordinator | mTLS service identity | TaskGraph, State, Agent Pool, Observability, Integration | — (it is the hub) |
 | Internal service (TaskGraph/State/Integration/Observability) | mTLS service identity | Postgres (own schema only), Observability (audit writes) | Other tenants' rows (RLS), other services outside its declared callers |
 
 ## Primary threats and mitigations
@@ -86,3 +89,11 @@ Coordinator ── mediates ALL cross-service and cross-agent coordination
   defense in depth is partial, not absent, until `AllowList` lands.
 - Secrets backend (KMS vs Vault) is not yet chosen — see
   `docs/adr/0006-secrets-management.md`.
+- Coordinator's `IntegrationClient` (`coordinator/app/integration_client.py`)
+  calls `IntegrationService.DetectConflicts` before finalizing a schedule
+  tick, but `/integration`'s own servicer is not implemented yet — every
+  call fails at the transport level today. This is a deliberate, logged
+  degradation (Scheduler falls back to ownership-boundary checks alone),
+  not a missing network path: `coordinator-edges.yaml` and
+  `integration-ingress` (`data-plane-edges.yaml`) both already permit the
+  edge, so no policy change is needed once `/integration` is implemented.

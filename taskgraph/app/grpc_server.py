@@ -134,12 +134,10 @@ class TaskGraphServicer:
         return taskgraph_pb2.CreateTaskNodeResponse(node=_node_to_proto(node))
 
     async def GetTaskNode(self, request, context):
-        # NOTE(tenancy): GetTaskNodeRequest carries no tenant_id, so there is
-        # nothing to bind_tenant() with here. Until the proto contract grows
-        # a tenant field (or the caller's tenant comes from verified
-        # metadata), this call will fail closed with a "no tenant bound"
-        # LookupError against a real TenantScopedPool rather than silently
-        # running unscoped.
+        if not request.tenant_id:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "tenant_id is required")
+
+        bind_tenant(TenantID(request.tenant_id))
         node = await self.repository.get(request.task_id)
         if node is None:
             await context.abort(
@@ -149,7 +147,10 @@ class TaskGraphServicer:
         return taskgraph_pb2.GetTaskNodeResponse(node=_node_to_proto(node))
 
     async def UpdateTaskStatus(self, request, context):
-        # NOTE(tenancy): same gap as GetTaskNode — no tenant_id on the wire.
+        if not request.tenant_id:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "tenant_id is required")
+
+        bind_tenant(TenantID(request.tenant_id))
         status = _TASK_STATUS_FROM_PROTO.get(request.status)
         if status is None:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "status must be specified")
@@ -172,7 +173,10 @@ class TaskGraphServicer:
         )
 
     async def ValidateOwnership(self, request, context):
-        # NOTE(tenancy): same gap as GetTaskNode — no tenant_id on the wire.
+        if not request.tenant_id:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "tenant_id is required")
+
+        bind_tenant(TenantID(request.tenant_id))
         node = await self.repository.get(request.task_id)
         if node is None:
             await context.abort(

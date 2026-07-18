@@ -60,9 +60,16 @@ class FakeCoordinatorClient:
     def __init__(self) -> None:
         self.reported_blockers: list[dict] = []
 
-    async def report_blocker(self, *, task_id: str, agent_id: str, description: str) -> bool:
+    async def report_blocker(
+        self, *, task_id: str, tenant_id: str, agent_id: str, description: str
+    ) -> bool:
         self.reported_blockers.append(
-            {"task_id": task_id, "agent_id": agent_id, "description": description}
+            {
+                "task_id": task_id,
+                "tenant_id": tenant_id,
+                "agent_id": agent_id,
+                "description": description,
+            }
         )
         return True
 

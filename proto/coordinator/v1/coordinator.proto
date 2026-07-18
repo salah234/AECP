@@ -34,6 +34,11 @@ message EscalateRequest {
   string agent_id = 2;
   string reason = 3;
   aecp.common.v1.RiskTier requested_risk_tier = 4;
+  // The calling agent session already knows its own tenant_id (from the
+  // AgentSession it was spawned with); carrying it here lets Coordinator
+  // bind_tenant() before it looks up the task node, rather than needing
+  // an unscoped lookup just to discover which tenant a task belongs to.
+  string tenant_id = 5;
 }
 
 message EscalateResponse {
@@ -45,6 +50,7 @@ message ReportBlockerRequest {
   string task_id = 1;
   string agent_id = 2;
   string description = 3;
+  string tenant_id = 4; // see EscalateRequest.tenant_id
 }
 
 message ReportBlockerResponse {

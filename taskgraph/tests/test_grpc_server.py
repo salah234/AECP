@@ -73,7 +73,8 @@ async def test_create_and_get_task_node_round_trips() -> None:
     assert response.node.status == common_pb2.TASK_STATUS_PENDING
 
     get_response = await servicer.GetTaskNode(
-        taskgraph_pb2.GetTaskNodeRequest(task_id=response.node.task_id), context
+        taskgraph_pb2.GetTaskNodeRequest(task_id=response.node.task_id, tenant_id=TENANT_ID),
+        context,
     )
     assert get_response.node.task_id == response.node.task_id
 
@@ -130,9 +131,21 @@ async def test_get_task_node_not_found() -> None:
     context = FakeContext()
 
     with pytest.raises(AbortedRPC) as exc_info:
-        await servicer.GetTaskNode(taskgraph_pb2.GetTaskNodeRequest(task_id="missing"), context)
+        await servicer.GetTaskNode(
+            taskgraph_pb2.GetTaskNodeRequest(task_id="missing", tenant_id=TENANT_ID), context
+        )
 
     assert exc_info.value.code == grpc.StatusCode.NOT_FOUND
+
+
+async def test_get_task_node_requires_tenant_id() -> None:
+    servicer, _repository = make_servicer()
+    context = FakeContext()
+
+    with pytest.raises(AbortedRPC) as exc_info:
+        await servicer.GetTaskNode(taskgraph_pb2.GetTaskNodeRequest(task_id="t1"), context)
+
+    assert exc_info.value.code == grpc.StatusCode.INVALID_ARGUMENT
 
 
 async def test_update_task_status_transitions_and_persists() -> None:
@@ -144,6 +157,7 @@ async def test_update_task_status_transitions_and_persists() -> None:
     response = await servicer.UpdateTaskStatus(
         taskgraph_pb2.UpdateTaskStatusRequest(
             task_id=created.node.task_id,
+            tenant_id=TENANT_ID,
             status=common_pb2.TASK_STATUS_IN_PROGRESS,
             reason="agent picked it up",
         ),
@@ -153,7 +167,8 @@ async def test_update_task_status_transitions_and_persists() -> None:
     assert response.node.status == common_pb2.TASK_STATUS_IN_PROGRESS
 
     refetched = await servicer.GetTaskNode(
-        taskgraph_pb2.GetTaskNodeRequest(task_id=created.node.task_id), context
+        taskgraph_pb2.GetTaskNodeRequest(task_id=created.node.task_id, tenant_id=TENANT_ID),
+        context,
     )
     assert refetched.node.status == common_pb2.TASK_STATUS_IN_PROGRESS
 
@@ -166,6 +181,7 @@ async def test_update_task_status_not_found() -> None:
         await servicer.UpdateTaskStatus(
             taskgraph_pb2.UpdateTaskStatusRequest(
                 task_id="missing",
+                tenant_id=TENANT_ID,
                 status=common_pb2.TASK_STATUS_DONE,
                 reason="n/a",
             ),
@@ -211,6 +227,7 @@ async def test_validate_ownership_reports_violations() -> None:
     response = await servicer.ValidateOwnership(
         taskgraph_pb2.ValidateOwnershipRequest(
             task_id=created.node.task_id,
+            tenant_id=TENANT_ID,
             changed_paths=[
                 "taskgraph/app/graph.py",
                 "taskgraph/app/nested/other.py",
@@ -229,7 +246,9 @@ async def test_validate_ownership_not_found() -> None:
 
     with pytest.raises(AbortedRPC) as exc_info:
         await servicer.ValidateOwnership(
-            taskgraph_pb2.ValidateOwnershipRequest(task_id="missing", changed_paths=[]),
+            taskgraph_pb2.ValidateOwnershipRequest(
+                task_id="missing", tenant_id=TENANT_ID, changed_paths=[]
+            ),
             context,
         )
 

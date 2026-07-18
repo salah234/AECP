@@ -64,6 +64,7 @@ async def _reap_loop(
             await pool.release_slot(session.tenant_id)
             await coordinator_client.report_blocker(
                 task_id=session.task_id,
+                tenant_id=session.tenant_id,
                 agent_id=session.session_id,
                 description=(
                     f"Agent session {session.session_id} exceeded its TTL "

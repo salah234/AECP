@@ -41,16 +41,18 @@ class ScheduleResponse(_message.Message):
     def __init__(self, decisions: _Optional[_Iterable[_Union[AssignmentDecision, _Mapping]]] = ...) -> None: ...
 
 class EscalateRequest(_message.Message):
-    __slots__ = ("task_id", "agent_id", "reason", "requested_risk_tier")
+    __slots__ = ("task_id", "agent_id", "reason", "requested_risk_tier", "tenant_id")
     TASK_ID_FIELD_NUMBER: _ClassVar[int]
     AGENT_ID_FIELD_NUMBER: _ClassVar[int]
     REASON_FIELD_NUMBER: _ClassVar[int]
     REQUESTED_RISK_TIER_FIELD_NUMBER: _ClassVar[int]
+    TENANT_ID_FIELD_NUMBER: _ClassVar[int]
     task_id: str
     agent_id: str
     reason: str
     requested_risk_tier: _common_pb2.RiskTier
-    def __init__(self, task_id: _Optional[str] = ..., agent_id: _Optional[str] = ..., reason: _Optional[str] = ..., requested_risk_tier: _Optional[_Union[_common_pb2.RiskTier, str]] = ...) -> None: ...
+    tenant_id: str
+    def __init__(self, task_id: _Optional[str] = ..., agent_id: _Optional[str] = ..., reason: _Optional[str] = ..., requested_risk_tier: _Optional[_Union[_common_pb2.RiskTier, str]] = ..., tenant_id: _Optional[str] = ...) -> None: ...
 
 class EscalateResponse(_message.Message):
     __slots__ = ("approved", "decided_by")
@@ -61,14 +63,16 @@ class EscalateResponse(_message.Message):
     def __init__(self, approved: _Optional[bool] = ..., decided_by: _Optional[str] = ...) -> None: ...
 
 class ReportBlockerRequest(_message.Message):
-    __slots__ = ("task_id", "agent_id", "description")
+    __slots__ = ("task_id", "agent_id", "description", "tenant_id")
     TASK_ID_FIELD_NUMBER: _ClassVar[int]
     AGENT_ID_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
+    TENANT_ID_FIELD_NUMBER: _ClassVar[int]
     task_id: str
     agent_id: str
     description: str
-    def __init__(self, task_id: _Optional[str] = ..., agent_id: _Optional[str] = ..., description: _Optional[str] = ...) -> None: ...
+    tenant_id: str
+    def __init__(self, task_id: _Optional[str] = ..., agent_id: _Optional[str] = ..., description: _Optional[str] = ..., tenant_id: _Optional[str] = ...) -> None: ...
 
 class ReportBlockerResponse(_message.Message):
     __slots__ = ("acknowledged",)
