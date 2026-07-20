@@ -20,6 +20,56 @@ It assigns work, tracks progress, enforces engineering standards, reviews code, 
 
 ---
 
+# Quickstart
+
+**Prerequisites:** Docker + Docker Compose, [`uv`](https://docs.astral.sh/uv/) (Python package/venv manager), Node.js 22+, and [`buf`](https://buf.build) if you need to regenerate proto stubs.
+
+```bash
+cp .env.example .env    # fill in OIDC_* if you're testing the gateway login flow;
+                         # every other value already has a working local-dev default
+make install             # installs every service's deps (Python venvs + platform) and dashboard's npm deps
+make dev-up               # boots the full local topology: postgres, otel-collector, jaeger,
+                          # all 7 backend services, gateway, and the dashboard (deploy/docker/docker-compose.yml)
+```
+
+Then apply migrations once against the running Postgres container (`taskgraph`, `state`, and `observability` each own one table set):
+
+```bash
+for svc in taskgraph state observability; do
+  docker compose -f deploy/docker/docker-compose.yml exec -T postgres \
+    psql -U aecp -d aecp < $svc/migrations/0001_*.sql
+done
+```
+
+Dashboard: http://localhost:3000 · Gateway: http://localhost:8080 · Jaeger UI: http://localhost:16686
+
+**Run a single service's tests directly** (each service is an independent `uv`-managed Python project):
+
+```bash
+cd coordinator && uv venv .venv && uv pip install -e . --group dev
+.venv/bin/pytest -q
+```
+
+**Run everything** (every backend service + dashboard):
+
+```bash
+make test        # loops pytest across every Python service
+cd dashboard && npm test && npm run typecheck && npm run lint
+```
+
+**Real, multi-container system tests** (boots every service as a real Docker container and drives full task lifecycles over real gRPC — no fakes): see the module docstring in `coordinator/tests/integration/test_e2e_docker_compose.py` and `test_full_system_e2e.py` for exact steps; summary:
+
+```bash
+docker compose -f coordinator/tests/integration/docker-compose.test.yml up -d --build
+python -c "from coordinator.tests.integration.test_e2e_docker_compose import apply_migrations as f; f()"
+AECP_RUN_DOCKER_INTEGRATION_TESTS=1 pytest coordinator/tests/integration -q
+docker compose -f coordinator/tests/integration/docker-compose.test.yml down -v
+```
+
+**Repository layout:** see `CLAUDE.md`'s "Repository Structure" section — it's the authoritative, binding description of what lives where and why. `docs/adr/` has the reasoning behind every major technical decision; `security/THREAT_MODEL.md` has the trust-boundary model and a running list of open security decisions.
+
+---
+
 # The Problem
 
 Today's coding agents are excellent at solving isolated tasks.
@@ -448,6 +498,8 @@ Rather than replacing software engineers, it aims to augment engineering organiz
 
 # Status
 
-🚧 **Development Phase**
+🚧 **Development Phase — core coordination loop implemented and tested, security hardening in progress**
 
-AECP is currently in the design and prototyping phase. The initial focus is validating multi-agent coordination, persistent engineering memory, autonomous planning, and long-running software development workflows.
+Every subsystem in the architecture below is real, running code, not a design sketch: `/coordinator`, `/taskgraph`, `/agents`, `/state`, `/integration`, `/observability`, `/gateway`, and the `/dashboard` all have working implementations with unit test coverage, and the full system has been verified end-to-end as real Docker containers talking real gRPC (`coordinator/tests/integration/test_full_system_e2e.py`) — task creation → scheduling → agent assignment → conflict detection → decision logging → audit trail → REST access all round-trip through the real services, not fakes.
+
+What's deliberately still open, tracked as ADRs rather than silently defaulted: the production secrets backend (`docs/adr/0006`), real per-service mTLS certificate issuance (`docs/adr/0008` — every service today authenticates internal callers via a documented interim scheme, not yet a cryptographically verified one), and the agent sandbox isolation technology (`docs/adr/0009` — `agents/app/sandbox.py`'s current implementation provides no real isolation and must not be pointed at real tenant code). See `security/THREAT_MODEL.md`'s "Open items" for the full list. Per `CLAUDE.md`'s Escalation Policy, all three are Tier 3 (security boundary) decisions requiring explicit human sign-off before implementation — not something either an agent or this document can unilaterally resolve.

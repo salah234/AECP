@@ -1,0 +1,78 @@
+# Dev/staging-cluster Postgres only. deploy/k8s/networkpolicy/data-plane-edges.yaml
+# already selects an in-cluster `app.kubernetes.io/component: postgres` pod
+# for taskgraph/state/integration/observability's egress rule, but no
+# matching workload existed anywhere in deploy/k8s until this file — that
+# NetworkPolicy rule was a silent no-op without it. Production should
+# most likely use managed cloud Postgres instead (deploy/terraform's
+# `postgres` module is reserved for that but is still an empty stub, and
+# which cloud/managed-vs-self-hosted AECP commits to is an open decision,
+# same class of question as docs/adr/0006's secrets backend). Use this
+# StatefulSet for local/staging clusters until that's decided; do not
+# treat it as a production-ready Postgres deployment (no backups, no HA,
+# no PITR).
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: aecp
+  labels:
+    app.kubernetes.io/name: aecp
+    app.kubernetes.io/component: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: postgres
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: 5432
+              name: postgres
+          envFrom:
+            - secretRef:
+                name: postgres-env
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests: { cpu: 250m, memory: 256Mi }
+            limits: { cpu: 1, memory: 1Gi }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: aecp
+spec:
+  selector:
+    app.kubernetes.io/component: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  clusterIP: None

@@ -5,6 +5,8 @@
  * exposes and redirects to /auth/login when unauthenticated.
  */
 
+const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? "";
+
 export interface CurrentUser {
   subject: string;
   tenantId: string;
@@ -12,9 +14,21 @@ export interface CurrentUser {
 }
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
-  throw new Error("not implemented");
+  const response = await fetch(`${GATEWAY_URL}/api/v1/me`, {
+    credentials: "include",
+  });
+
+  if (response.status === 401) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Failed to resolve current user (${response.status})`);
+  }
+
+  return (await response.json()) as CurrentUser;
 }
 
 export function redirectToLogin(): void {
-  throw new Error("not implemented");
+  window.location.href = `${GATEWAY_URL}/auth/login`;
 }

@@ -1,12 +1,15 @@
+"""Taskgraph-specific settings, layered on aecp_platform.config.Loader.
+
+TaskGraph handles the execution workflow (stores the structure of the
+workflow); State is runtime data and artifacts.
+"""
+
 from __future__ import annotations
 
-"""Taskgraph-specific settings, layered on aecp_platform.config.Loader."""
-"""TaskGraph handles the execution workflow (store structure of workflow), State is Runtime Data and artifacts"""
-
-
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -35,12 +38,12 @@ class Settings:
             return value
 
         grpc_port = int(require("TASKGRAPH_GRPC_PORT"))
-        http_port = int(require("GATEWAY_HTTP_PORT"))
+        http_port = int(require("TASKGRAPH_HTTP_PORT"))
 
         if not (1 <= grpc_port <= 65535):
             raise ValueError("TASKGRAPH_GRPC_PORT NOT IN BOUNDS")
         if not (1 <= http_port <= 65535):
-            raise ValueError("GATEWAY_HTTP_PORT NOT IN BOUNDS")
+            raise ValueError("TASKGRAPH_HTTP_PORT NOT IN BOUNDS")
 
         allowed_callers = tuple(
             caller.strip()

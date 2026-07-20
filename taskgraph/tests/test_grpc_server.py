@@ -91,6 +91,49 @@ async def test_create_task_node_requires_explicit_risk_tier() -> None:
     assert exc_info.value.code == grpc.StatusCode.INVALID_ARGUMENT
 
 
+async def test_create_task_node_forces_review_gate_for_structural_tier() -> None:
+    """A caller cannot understate the review gate for a tier that
+    requires human approval (see app.risk_tier.requires_human_approval) —
+    the tier's own policy wins even if requires_human_review_gate=False
+    was requested.
+    """
+    servicer, _repository = make_servicer()
+    context = FakeContext()
+
+    request = taskgraph_pb2.CreateTaskNodeRequest(
+        node=taskgraph_pb2.TaskNode(
+            tenant_id=TENANT_ID,
+            title="Change the auth boundary",
+            risk_tier=common_pb2.RISK_TIER_STRUCTURAL,
+            ownership=common_pb2.OwnershipBoundary(path_globs=["taskgraph/app/**"]),
+            definition_of_done=taskgraph_pb2.DefinitionOfDone(requires_human_review_gate=False),
+        )
+    )
+
+    response = await servicer.CreateTaskNode(request, context)
+
+    assert response.node.definition_of_done.requires_human_review_gate is True
+
+
+async def test_create_task_node_leaves_review_gate_false_for_mechanical_tier() -> None:
+    servicer, _repository = make_servicer()
+    context = FakeContext()
+
+    request = taskgraph_pb2.CreateTaskNodeRequest(
+        node=taskgraph_pb2.TaskNode(
+            tenant_id=TENANT_ID,
+            title="Fix a typo",
+            risk_tier=common_pb2.RISK_TIER_MECHANICAL,
+            ownership=common_pb2.OwnershipBoundary(path_globs=["taskgraph/app/**"]),
+            definition_of_done=taskgraph_pb2.DefinitionOfDone(requires_human_review_gate=False),
+        )
+    )
+
+    response = await servicer.CreateTaskNode(request, context)
+
+    assert response.node.definition_of_done.requires_human_review_gate is False
+
+
 async def test_create_task_node_rejects_dangling_dependency() -> None:
     servicer, repository = make_servicer()
     context = FakeContext()

@@ -1,15 +1,25 @@
 version: "3.9"
 
-# Throwaway topology for coordinator's end-to-end integration test
-# (test_e2e_docker_compose.py). Boots real postgres + taskgraph + state +
-# agents + coordinator containers over a real Docker network and talks to
-# them over real gRPC — no fakes, no mocks. Distinct from
-# deploy/docker/docker-compose.yml (the full local-dev topology): this
-# intentionally omits integration/observability/gateway/dashboard, whose
-# own servicers are still unimplemented stubs that would crash on boot,
-# and skips the shared root .env in favor of explicit inline environment
-# blocks so this test never depends on (or risks reading) developer
-# secrets in that file.
+# Full-system throwaway topology: postgres + all 7 backend services
+# (taskgraph, state, agents, coordinator, integration, observability,
+# gateway) over a real Docker network, talking real gRPC/HTTP — no
+# fakes, no mocks. Originally omitted integration/observability/gateway
+# because their servicers were unimplemented stubs that would crash on
+# boot; all three are now real, so this topology is complete. Distinct
+# from deploy/docker/docker-compose.yml (the actual local-dev topology,
+# which also runs dashboard/otel-collector/jaeger): this skips the
+# shared root .env in favor of explicit inline environment blocks so
+# this test never depends on (or risks reading) developer secrets in
+# that file. dashboard/otel-collector/jaeger are still omitted — neither
+# is needed to exercise the backend system end to end.
+#
+# gateway's OIDC discovery happens eagerly at startup (see
+# gateway/app/main.py's lifespan) and there's no mock IdP here, so
+# OIDC_ISSUER_URL points at a real, publicly reachable, always-up
+# discovery endpoint (Google's) purely to satisfy that call — this
+# container needs real internet egress, not just the aecp-test bridge
+# network, and no real login is ever completed through it in these
+# tests.
 #
 # Run via: docker compose -f coordinator/tests/integration/docker-compose.test.yml up -d --build
 
@@ -37,10 +47,10 @@ services:
         condition: service_healthy
     environment:
       TASKGRAPH_GRPC_PORT: "50052"
-      GATEWAY_HTTP_PORT: "8080"
+      TASKGRAPH_HTTP_PORT: "8080"
       POSTGRES_DSN: "postgresql://aecp:aecp_dev_only@postgres:5432/aecp"
       OTEL_COLLECTOR_ENDPOINT: "otel-collector:4317"
-      ALLOWED_CALLERS: "coordinator,gateway"
+      ALLOWED_CALLERS: "coordinator,gateway,integration"
       MTLS_CERT_FILE: ""
       MTLS_KEY_FILE: ""
       MTLS_CA_FILE: ""
@@ -55,12 +65,12 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      GRPC_PORT: "50051"
-      HTTP_PORT: "8080"
+      STATE_GRPC_PORT: "50051"
+      STATE_HTTP_PORT: "8080"
       POSTGRES_DSN: "postgresql://aecp:aecp_dev_only@postgres:5432/aecp"
       OBJECT_STORAGE_BUCKET: "/tmp/aecp-state-artifacts"
       OTEL_COLLECTOR_ENDPOINT: "otel-collector:4317"
-      ALLOWED_CALLERS: "coordinator,agents,gateway"
+      ALLOWED_CALLERS: "coordinator,agents,gateway,integration"
       MTLS_CERT_FILE: ""
       MTLS_KEY_FILE: ""
       MTLS_CA_FILE: ""
@@ -105,10 +115,10 @@ services:
       TASKGRAPH_ADDR: "taskgraph:50052"
       STATE_ADDR: "state:50051"
       AGENTS_ADDR: "agents:50053"
-      # No integration/observability containers in this topology — both
-      # addresses are intentionally unreachable so IntegrationClient /
-      # AuditClient exercise their real, documented graceful-degradation
-      # path (transport failure -> logged warning, not a crash).
+      # Both are now real containers in this topology (see below) —
+      # IntegrationClient/AuditClient's graceful-degradation path is
+      # still exercised for real by any other failure mode (e.g. one
+      # container not up yet), just no longer by "doesn't exist at all".
       INTEGRATION_ADDR: "integration:50055"
       OBSERVABILITY_ADDR: "observability:50056"
       OTEL_COLLECTOR_ENDPOINT: "otel-collector:4317"
@@ -117,6 +127,71 @@ services:
       MTLS_KEY_FILE: ""
       MTLS_CA_FILE: ""
     ports: ["55054:50054", "58081:8080"]
+    networks: [aecp-test]
+
+  integration:
+    build:
+      context: ../../..
+      dockerfile: integration/Dockerfile
+    depends_on: [taskgraph, state]
+    environment:
+      INTEGRATION_GRPC_PORT: "50055"
+      INTEGRATION_HTTP_PORT: "8080"
+      TASKGRAPH_ADDR: "taskgraph:50052"
+      STATE_ADDR: "state:50051"
+      OTEL_COLLECTOR_ENDPOINT: "otel-collector:4317"
+      ALLOWED_CALLERS: "coordinator,gateway"
+      MTLS_CERT_FILE: ""
+      MTLS_KEY_FILE: ""
+      MTLS_CA_FILE: ""
+    ports: ["55055:50055", "58082:8080"]
+    networks: [aecp-test]
+
+  observability:
+    build:
+      context: ../../..
+      dockerfile: observability/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      OBSERVABILITY_GRPC_PORT: "50056"
+      OBSERVABILITY_HTTP_PORT: "8080"
+      POSTGRES_DSN: "postgresql://aecp:aecp_dev_only@postgres:5432/aecp"
+      OTEL_COLLECTOR_ENDPOINT: "otel-collector:4317"
+      ALLOWED_CALLERS: "coordinator,taskgraph,state,agents,integration,gateway"
+      MTLS_CERT_FILE: ""
+      MTLS_KEY_FILE: ""
+      MTLS_CA_FILE: ""
+    ports: ["55056:50056", "58083:8080"]
+    networks: [aecp-test]
+
+  gateway:
+    build:
+      context: ../../..
+      dockerfile: gateway/Dockerfile
+    depends_on: [coordinator, taskgraph, state, integration, observability]
+    environment:
+      GATEWAY_HTTP_PORT: "8080"
+      GATEWAY_SESSION_SECRET_KEY: "test-only-session-secret"
+      # Real, public, always-up discovery endpoint — see this file's
+      # header comment for why gateway needs one even though no real
+      # login ever happens in these tests.
+      OIDC_ISSUER_URL: "https://accounts.google.com"
+      OIDC_CLIENT_ID: "test-client-id"
+      OIDC_CLIENT_SECRET: "test-client-secret"
+      OIDC_REDIRECT_URL: "http://localhost:58084/auth/callback"
+      COORDINATOR_ADDR: "coordinator:50054"
+      TASKGRAPH_ADDR: "taskgraph:50052"
+      STATE_ADDR: "state:50051"
+      INTEGRATION_ADDR: "integration:50055"
+      OBSERVABILITY_ADDR: "observability:50056"
+      RATE_LIMIT_REQUESTS_PER_MINUTE: "1000"
+      OTEL_COLLECTOR_ENDPOINT: "otel-collector:4317"
+      MTLS_CERT_FILE: ""
+      MTLS_KEY_FILE: ""
+      MTLS_CA_FILE: ""
+    ports: ["58084:8080"]
     networks: [aecp-test]
 
 networks:

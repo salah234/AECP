@@ -1,0 +1,63 @@
+# Same template as gateway-deployment.yaml. Agent Pool has NO edge to
+# taskgraph/integration/observability/gateway and no edge to itself
+# (no agent-to-agent) — see networkpolicy/agents-edges.yaml.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agents
+  namespace: aecp
+  labels:
+    app.kubernetes.io/name: aecp
+    app.kubernetes.io/component: agents
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: agents
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: agents
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: agents
+          image: aecp/agents:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: 50053
+              name: grpc
+            - containerPort: 8081
+              name: http
+          envFrom:
+            - secretRef:
+                name: agents-env
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agents
+  namespace: aecp
+spec:
+  selector:
+    app.kubernetes.io/component: agents
+  ports:
+    - port: 50053
+      targetPort: 50053
+      name: grpc
+    - port: 8081
+      targetPort: 8081
+      name: http
+  type: ClusterIP

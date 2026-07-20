@@ -1,7 +1,10 @@
-"""Real end-to-end integration test: boots postgres + taskgraph + state +
-agents + coordinator as real Docker containers (see docker-compose.test.yml
-in this directory) and drives one full task lifecycle over real gRPC — no
-fakes, no mocks. This is deliberately separate from coordinator/tests/'s
+"""Real end-to-end integration test: boots postgres + all 7 backend
+services (see docker-compose.test.yml in this directory) as real Docker
+containers and drives one full task lifecycle over real gRPC — no fakes,
+no mocks. This file's own tests only exercise taskgraph/state/agents/
+coordinator directly; see test_full_system_e2e.py in this same directory
+for the integration/observability/gateway coverage now that the topology
+includes them too. This is deliberately separate from coordinator/tests/'s
 fast, hermetic unit suite: it requires Docker and is opt-in via the
 AECP_RUN_DOCKER_INTEGRATION_TESTS env var so `pytest`/`make test` stays
 fast by default and never silently fails on a machine without Docker.
@@ -245,6 +248,7 @@ def apply_migrations() -> None:
     for migration in (
         REPO_ROOT / "taskgraph" / "migrations" / "0001_task_nodes.sql",
         REPO_ROOT / "state" / "migrations" / "0001_state_layer.sql",
+        REPO_ROOT / "observability" / "migrations" / "0001_audit_trail.sql",
     ):
         subprocess.run(
             [

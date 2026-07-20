@@ -64,10 +64,10 @@ class Settings:
 
         return cls(
             http_port=http_port,
-            session_secret_key=require("SESSION_SECRET_KEY"),
+            session_secret_key=require("GATEWAY_SESSION_SECRET_KEY"),
             oidc_issuer_url=require("OIDC_ISSUER_URL"),
             oidc_client_id=require("OIDC_CLIENT_ID"),
-            oidc_client_secret_key=require("OIDC_CLIENT_SECRET_KEY"),
+            oidc_client_secret_key=require("OIDC_CLIENT_SECRET"),
             oidc_redirect_url=require("OIDC_REDIRECT_URL"),
             coordinator_addr=require("COORDINATOR_ADDR"),
             taskgraph_addr=require("TASKGRAPH_ADDR"),

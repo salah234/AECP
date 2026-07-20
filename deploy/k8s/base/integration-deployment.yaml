@@ -1,0 +1,66 @@
+# Same template as gateway-deployment.yaml. replicas: 1 is deliberate,
+# not a placeholder: IntegrationServicer caches DetectConflicts' reports
+# in-memory, keyed by report_id, for ResolveMergePolicy to look up later
+# (see integration/app/grpc_server.py) — a second replica would 404 on
+# any report_id it didn't itself generate. Raise this once that cache is
+# backed by real persistence (see conflict.py's own MVP note).
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: integration
+  namespace: aecp
+  labels:
+    app.kubernetes.io/name: aecp
+    app.kubernetes.io/component: integration
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: integration
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: integration
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: integration
+          image: aecp/integration:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: 50055
+              name: grpc
+            - containerPort: 8085
+              name: http
+          envFrom:
+            - secretRef:
+                name: integration-env
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: integration
+  namespace: aecp
+spec:
+  selector:
+    app.kubernetes.io/component: integration
+  ports:
+    - port: 50055
+      targetPort: 50055
+      name: grpc
+    - port: 8085
+      targetPort: 8085
+      name: http
+  type: ClusterIP

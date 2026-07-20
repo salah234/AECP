@@ -29,3 +29,8 @@ packages = ["app"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# Explicit, not just the editable install: this shell's Python build
+# silently skips .pth files whose names start with "_" (how uv's own
+# editable-install hooks are named), so aecp-platform's editable install
+# doesn't reliably land on sys.path without this.
+pythonpath = [".", "../platform"]

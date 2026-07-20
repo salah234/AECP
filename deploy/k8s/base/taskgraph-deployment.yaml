@@ -1,0 +1,61 @@
+# Same template as gateway-deployment.yaml.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: taskgraph
+  namespace: aecp
+  labels:
+    app.kubernetes.io/name: aecp
+    app.kubernetes.io/component: taskgraph
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: taskgraph
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: taskgraph
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: taskgraph
+          image: aecp/taskgraph:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: 50052
+              name: grpc
+            - containerPort: 8083
+              name: http
+          envFrom:
+            - secretRef:
+                name: taskgraph-env
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: taskgraph
+  namespace: aecp
+spec:
+  selector:
+    app.kubernetes.io/component: taskgraph
+  ports:
+    - port: 50052
+      targetPort: 50052
+      name: grpc
+    - port: 8083
+      targetPort: 8083
+      name: http
+  type: ClusterIP

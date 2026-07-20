@@ -14,6 +14,54 @@ from app.decision_log import DecisionLogEntry
 from app.drift import DriftReport, ModuleState
 from app.ownership_map import OwnershipRecord
 
+# asyncpg decodes Postgres UUID columns as uuid.UUID objects, not str —
+# every id field below needs explicit stringification before it can be
+# assigned to a proto string field (which raises a bare TypeError on a
+# non-str/bytes value: "bad argument type for built-in operation").
+# Reproduced live against a real Postgres container, not hypothetical.
+# Same pattern already established in taskgraph/app/repository.py's
+# _node_from_row.
+
+
+def _ownership_record_from_row(row) -> OwnershipRecord:
+    data = dict(row)
+    data["tenant_id"] = str(data["tenant_id"])
+    data["last_task_id"] = str(data["last_task_id"])
+    data["last_agent_id"] = str(data["last_agent_id"])
+    return OwnershipRecord(**data)
+
+
+def _interface_contract_from_row(row) -> InterfaceContract:
+    data = dict(row)
+    data["contract_id"] = str(data["contract_id"])
+    data["tenant_id"] = str(data["tenant_id"])
+    return InterfaceContract(**data)
+
+
+def _decision_log_entry_from_row(row) -> DecisionLogEntry:
+    data = dict(row)
+    data["entry_id"] = str(data["entry_id"])
+    data["tenant_id"] = str(data["tenant_id"])
+    data["task_id"] = str(data["task_id"])
+    if data.get("supersedes_entry_id") is not None:
+        data["supersedes_entry_id"] = str(data["supersedes_entry_id"])
+    return DecisionLogEntry(**data)
+
+
+def _drift_report_from_row(row) -> DriftReport:
+    data = dict(row)
+    data["report_id"] = str(data["report_id"])
+    data["tenant_id"] = str(data["tenant_id"])
+    data["contract_id"] = str(data["contract_id"])
+    return DriftReport(**data)
+
+
+def _module_state_from_row(row) -> ModuleState:
+    data = dict(row)
+    data["tenant_id"] = str(data["tenant_id"])
+    data["contract_id"] = str(data["contract_id"])
+    return ModuleState(**data)
+
 
 class StateRepository:
     def __init__(self, pool, object_storage_client) -> None:
@@ -93,7 +141,7 @@ class StateRepository:
         if row is None:
             return None
 
-        return OwnershipRecord(**dict(row))
+        return _ownership_record_from_row(row)
 
     async def get_contract(self, contract_id: str) -> InterfaceContract | None:
         async with self.pool.transaction() as conn:
@@ -112,7 +160,7 @@ class StateRepository:
         if row is None:
             return None
 
-        return InterfaceContract(**dict(row))
+        return _interface_contract_from_row(row)
 
     async def get_contract_version(
         self,
@@ -135,7 +183,7 @@ class StateRepository:
         if row is None:
             return None
 
-        return InterfaceContract(**dict(row))
+        return _interface_contract_from_row(row)
 
     async def get_decisions_by_task(self, task_id: str) -> list[DecisionLogEntry]:
         async with self.pool.transaction() as conn:
@@ -149,7 +197,7 @@ class StateRepository:
                 task_id,
             )
 
-        return [DecisionLogEntry(**dict(row)) for row in rows]
+        return [_decision_log_entry_from_row(row) for row in rows]
 
     async def get_decisions_for_module(
         self,
@@ -238,7 +286,7 @@ class StateRepository:
         if row is None:
             return None
 
-        return DriftReport(**dict(row))
+        return _drift_report_from_row(row)
 
     async def update_drift_report(
         self,
@@ -296,7 +344,7 @@ class StateRepository:
         if row is None:
             return None
 
-        return ModuleState(**dict(row))
+        return _module_state_from_row(row)
 
     async def save_module_state(
         self,

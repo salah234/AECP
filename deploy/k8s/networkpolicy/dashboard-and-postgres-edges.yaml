@@ -1,0 +1,66 @@
+# Dashboard: same shape as gateway-edges.yaml — ingress only from
+# ingress-nginx, egress only to gateway (never to any internal service
+# directly, per dashboard/lib/api-client.ts's own docstring) plus DNS.
+# Postgres: ingress only from the four data-plane services already
+# granted egress to it in data-plane-edges.yaml — that file authorizes
+# their outbound side, this authorizes postgres's inbound side, which
+# was missing (postgres had no NetworkPolicy of its own until this file).
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dashboard-ingress-from-ingress-controller
+  namespace: aecp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: dashboard
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dashboard-egress-to-gateway
+  namespace: aecp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: dashboard
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: gateway
+      ports:
+        - port: 8080
+    - ports:
+        - port: 53
+          protocol: UDP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-ingress-from-data-plane
+  namespace: aecp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: postgres
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values: [taskgraph, state, integration, observability]
+      ports:
+        - port: 5432

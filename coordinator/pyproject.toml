@@ -19,6 +19,13 @@ aecp-platform = { path = "../platform", editable = true }
 [dependency-groups]
 dev = ["ruff>=0.7", "mypy>=1.13", "pytest>=8.3", "pytest-asyncio>=0.24"]
 
+[tool.pytest.ini_options]
+# Explicit, not just the editable install: this shell's Python build
+# silently skips .pth files whose names start with "_" (how uv's own
+# editable-install hooks are named), so aecp-platform's editable install
+# doesn't reliably land on sys.path without this.
+pythonpath = [".", "../platform"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

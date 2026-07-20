@@ -66,34 +66,47 @@ Coordinator ── mediates ALL cross-service and cross-agent coordination
 
 - Agent sandbox concrete implementation (`agents/app/sandbox.py`) is not
   yet chosen (gVisor/Firecracker/container-only) — this is a Tier 3
-  decision and needs its own ADR before implementation starts.
-  `agents/app/sandbox.py`'s current `Sandbox` class is explicitly a
-  non-isolating dev/test placeholder (scratch directory only, no process/
-  filesystem/network isolation) so the rest of Agent Pool (spawn,
-  handoff, teardown, capacity accounting) could be implemented and tested
-  end-to-end without blocking on this decision. Do not treat it as a
-  security boundary; it is load-bearing for nothing in this table.
+  decision; see `docs/adr/0009-agent-sandbox-isolation-technology.md`
+  (proposal, decision not yet made). `agents/app/sandbox.py`'s current
+  `Sandbox` class is explicitly a non-isolating dev/test placeholder
+  (scratch directory only, no process/filesystem/network isolation) so
+  the rest of Agent Pool (spawn, handoff, teardown, capacity accounting)
+  could be implemented and tested end-to-end without blocking on this
+  decision. Do not treat it as a security boundary; it is load-bearing
+  for nothing in this table.
 - Agent session credentials (`agents/app/identity.py`) are HMAC-signed
   opaque tokens, not real mTLS client certificates — an interim scheme
-  pending `platform/aecp_platform/identity.py` (Tier 3, owned by
-  /platform). Same caveat as `AllowListInterceptor` below: acceptable for
-  now, not the final mechanism.
-- The application-layer mitigation for threat #2
-  (`platform/aecp_platform/identity.AllowList`) is not yet implemented.
-  Every service that has a gRPC server today (`taskgraph`, `state`,
-  `agents`) instead uses its own local, metadata-based
-  `AllowListInterceptor` (caller-supplied `caller-id`, not a verified mTLS
-  peer identity) as an interim placeholder — see
-  `agents/app/interceptors.py`. The network-layer mitigation
-  (`deploy/k8s/networkpolicy/`) is real and enforced independently, so
-  defense in depth is partial, not absent, until `AllowList` lands.
+  pending real certificate issuance; see
+  `docs/adr/0008-mtls-cert-issuance-and-allowlist-rollout.md`. Same
+  caveat as `AllowListInterceptor` below: acceptable for now, not the
+  final mechanism.
+- `platform/aecp_platform/identity.AllowList` (the application-layer
+  mitigation for threat #2) **is implemented and working** — Coordinator
+  is already built against it directly
+  (`coordinator/app/grpc_server.py`). What's still open is the rollout:
+  no environment this repo ships (`.env`, either docker-compose
+  topology) sets real `MTLS_CERT_FILE`/`MTLS_KEY_FILE`/`MTLS_CA_FILE`
+  values yet, so even Coordinator's real `AllowList` only ever exercises
+  its documented metadata-based fallback (a caller-supplied `caller-id`,
+  not a verified mTLS peer identity) in practice today — and
+  taskgraph/state/agents/integration/observability each still use their
+  own local, hand-rolled `AllowListInterceptor` copy (see
+  `taskgraph/app/interceptors.py` and its near-identical siblings)
+  rather than the shared `aecp_platform.identity.AllowList`. See
+  `docs/adr/0008-mtls-cert-issuance-and-allowlist-rollout.md` for the
+  full breakdown and the actual blocking decision (how certs get
+  issued). The network-layer mitigation (`deploy/k8s/networkpolicy/`) is
+  real and enforced independently, so defense in depth is partial, not
+  absent, until this lands.
 - Secrets backend (KMS vs Vault) is not yet chosen — see
   `docs/adr/0006-secrets-management.md`.
-- Coordinator's `IntegrationClient` (`coordinator/app/integration_client.py`)
-  calls `IntegrationService.DetectConflicts` before finalizing a schedule
-  tick, but `/integration`'s own servicer is not implemented yet — every
-  call fails at the transport level today. This is a deliberate, logged
-  degradation (Scheduler falls back to ownership-boundary checks alone),
-  not a missing network path: `coordinator-edges.yaml` and
-  `integration-ingress` (`data-plane-edges.yaml`) both already permit the
-  edge, so no policy change is needed once `/integration` is implemented.
+- `/integration` and `/observability` are now fully implemented (both
+  were previously unimplemented stubs at the time this document's threat
+  table was written) and covered by a real Docker-based system test
+  exercising Coordinator↔Integration↔TaskGraph↔State↔Observability
+  together (`coordinator/tests/integration/test_full_system_e2e.py`).
+  Coordinator's `IntegrationClient`/`AuditClient` graceful-degradation
+  paths (transport failure → logged warning, not a crash) remain in
+  place and are still real, correct behavior for a genuinely unreachable
+  peer — they're simply no longer the *only* path exercised, now that
+  both services actually run.

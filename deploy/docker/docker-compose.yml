@@ -38,6 +38,16 @@ services:
       dockerfile: taskgraph/Dockerfile
     depends_on: [postgres, otel-collector]
     env_file: ../../.env
+    # ALLOWED_CALLERS differs per service (see networkpolicy/data-plane-edges.yaml)
+    # and a single shared .env key can't express that — overridden per service here.
+    # POSTGRES_DSN is also overridden: the shared .env's value points at
+    # `localhost`, correct for running a service directly on the host but
+    # wrong once it's a container in this network — `localhost` there means
+    # the container itself, not the postgres container (reachable by its
+    # compose service name instead).
+    environment:
+      ALLOWED_CALLERS: "coordinator,gateway,integration"
+      POSTGRES_DSN: "postgresql://aecp:aecp_dev_only@postgres:5432/aecp"
     networks: [aecp]
 
   state:
@@ -46,6 +56,9 @@ services:
       dockerfile: state/Dockerfile
     depends_on: [postgres, otel-collector]
     env_file: ../../.env
+    environment:
+      ALLOWED_CALLERS: "coordinator,agents,gateway,integration"
+      POSTGRES_DSN: "postgresql://aecp:aecp_dev_only@postgres:5432/aecp"
     networks: [aecp]
 
   coordinator:
@@ -54,6 +67,8 @@ services:
       dockerfile: coordinator/Dockerfile
     depends_on: [taskgraph, state, otel-collector]
     env_file: ../../.env
+    environment:
+      ALLOWED_CALLERS: "agents,gateway"
     networks: [aecp]
 
   agents:
@@ -62,6 +77,8 @@ services:
       dockerfile: agents/Dockerfile
     depends_on: [coordinator, state, otel-collector]
     env_file: ../../.env
+    # ALLOWED_CALLERS="coordinator" from the shared .env is already correct
+    # here (see deploy/k8s/networkpolicy/agents-edges.yaml) — no override.
     networks: [aecp]
 
   integration:
@@ -70,6 +87,8 @@ services:
       dockerfile: integration/Dockerfile
     depends_on: [taskgraph, state, otel-collector]
     env_file: ../../.env
+    environment:
+      ALLOWED_CALLERS: "coordinator,gateway"
     networks: [aecp]
 
   observability:
@@ -78,6 +97,13 @@ services:
       dockerfile: observability/Dockerfile
     depends_on: [postgres, otel-collector]
     env_file: ../../.env
+    # Any service may write audit events (networkpolicy/data-plane-edges.yaml
+    # allows ingress from every namespace on this port) — enumerate every
+    # real caller since AllowList has no wildcard. POSTGRES_DSN override:
+    # see taskgraph's comment above — same localhost-vs-container-network fix.
+    environment:
+      ALLOWED_CALLERS: "coordinator,taskgraph,state,agents,integration,gateway"
+      POSTGRES_DSN: "postgresql://aecp:aecp_dev_only@postgres:5432/aecp"
     networks: [aecp]
 
   gateway:
@@ -94,11 +120,15 @@ services:
     build:
       context: ../..
       dockerfile: dashboard/Dockerfile
+      # Must be a build arg, not just a runtime `environment:` entry —
+      # Next.js bakes NEXT_PUBLIC_* into the client bundle when `npm run
+      # build` runs, which happens during `docker compose build`, before
+      # any runtime environment exists. See dashboard/Dockerfile's comment.
+      args:
+        NEXT_PUBLIC_GATEWAY_URL: "http://localhost:8080"
     depends_on: [gateway]
     ports:
       - "3000:3000"
-    environment:
-      NEXT_PUBLIC_GATEWAY_URL: "http://localhost:8080"
     networks: [aecp]
 
 networks:

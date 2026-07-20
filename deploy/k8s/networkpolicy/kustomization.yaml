@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - default-deny.yaml
+  - gateway-edges.yaml
+  - coordinator-edges.yaml
+  - agents-edges.yaml
+  - data-plane-edges.yaml
+  - dashboard-and-postgres-edges.yaml

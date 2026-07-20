@@ -39,3 +39,15 @@ plugins:
 
   - remote: buf.build/grpc/python
     out: ../gateway/app
+
+  - remote: buf.build/protocolbuffers/python
+    out: ../integration/app
+
+  - remote: buf.build/grpc/python
+    out: ../integration/app
+
+  - remote: buf.build/protocolbuffers/python
+    out: ../observability/app
+
+  - remote: buf.build/grpc/python
+    out: ../observability/app

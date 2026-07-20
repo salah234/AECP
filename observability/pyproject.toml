@@ -8,15 +8,26 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "grpcio>=1.68",
+    "grpcio-reflection>=1.68",
+    "protobuf>=5.29",
     "asyncpg>=0.30",
     "prometheus-client>=0.21",
+    "python-dotenv>=1.0.0",
 ]
 
 [tool.uv.sources]
 aecp-platform = { path = "../platform", editable = true }
 
 [dependency-groups]
-dev = ["ruff>=0.7", "mypy>=1.13", "pytest>=8.3", "pytest-asyncio>=0.24"]
+dev = [
+    "ruff>=0.7",
+    "mypy>=1.13",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "types-protobuf>=5.29",
+    "types-grpcio>=1.68",
+    "types-grpcio-reflection>=1.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -24,3 +35,66 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# Explicit, not just the editable install: this shell's Python build
+# silently skips .pth files whose names start with "_" (how uv's own
+# editable-install hooks are named), so aecp-platform's editable install
+# doesn't reliably land on sys.path without this.
+pythonpath = [".", "../platform"]
+
+[tool.ruff]
+# Generated code ("DO NOT EDIT" per protoc/buf) is not hand-maintained
+# and shouldn't be lint-gated; only app/*_pb2.py-adjacent packages match
+# this, never hand-written modules.
+extend-exclude = [
+    "app/agents/v1",
+    "app/common/v1",
+    "app/coordinator/v1",
+    "app/integration/v1",
+    "app/observability/v1",
+    "app/state/v1",
+    "app/taskgraph/v1",
+]
+
+[tool.mypy]
+exclude = [
+    "app/agents/v1",
+    "app/common/v1",
+    "app/coordinator/v1",
+    "app/integration/v1",
+    "app/observability/v1",
+    "app/state/v1",
+    "app/taskgraph/v1",
+]
+
+# `exclude` above only keeps mypy from using these generated files as scan
+# entry points; it does not stop mypy from following imports *into* them
+# from hand-written code (grpc_server.py imports app.common.v1.common_pb2,
+# etc). Their message/enum attributes are assembled dynamically by
+# protobuf's upb-backed runtime with no accompanying .pyi, so mypy can
+# only ever see "Module has no attribute ..." for them. follow_imports =
+# "skip" treats each import as Any instead of type-checking the
+# generated source, which is the correct outcome for code mypy was never
+# meant to check in the first place.
+[[tool.mypy.overrides]]
+module = [
+    "app.agents.v1.*",
+    "app.common.v1.*",
+    "app.coordinator.v1.*",
+    "app.integration.v1.*",
+    "app.observability.v1.*",
+    "app.state.v1.*",
+    "app.taskgraph.v1.*",
+]
+ignore_missing_imports = true
+follow_imports = "skip"
+
+# aecp_platform and asyncpg ship no py.typed marker / stub package, so
+# mypy can only ever report "missing library stubs" for them, never a
+# real finding about our code. Silence that noise without turning off
+# checking anywhere else.
+[[tool.mypy.overrides]]
+module = ["aecp_platform.*", "asyncpg.*"]
+ignore_missing_imports = true

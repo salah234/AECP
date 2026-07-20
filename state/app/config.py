@@ -1,12 +1,16 @@
 """State layer settings, layered on aecp_platform.config.Loader."""
 
 from __future__ import annotations
+
 import os
+from dataclasses import dataclass
+from pathlib import Path
+
 from dotenv import load_dotenv
 
-from dataclasses import dataclass
+ROOT_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(ROOT_DIR / ".env")
 
-load_dotenv()
 
 @dataclass
 class Settings:
@@ -25,21 +29,21 @@ class Settings:
         """Load and validate settings from the environment, failing closed
         on any missing/invalid required value.
         """
-        
+
         def require(name: str) -> str:
             value = os.getenv(name)
             if value is None or value.strip() == "":
                 raise ValueError(f"Missing required environment variable: {name}")
             return value
 
-        grpc_port = int(require("GRPC_PORT"))
-        http_port = int(require("HTTP_PORT"))
+        grpc_port = int(require("STATE_GRPC_PORT"))
+        http_port = int(require("STATE_HTTP_PORT"))
 
         if not (1 <= grpc_port <= 65535):
-            raise ValueError("GRPC_PORT NOT IN BOUNDS")
+            raise ValueError("STATE_GRPC_PORT NOT IN BOUNDS")
         if not (1 <= http_port <= 65535):
-            raise ValueError("HTTP_PORT NOT IN BOUNDS")
-        
+            raise ValueError("STATE_HTTP_PORT NOT IN BOUNDS")
+
         allowed_callers = tuple(
             caller.strip()
             for caller in require("ALLOWED_CALLERS").split(",")
@@ -52,13 +56,13 @@ class Settings:
             grpc_port=grpc_port,
             http_port=http_port,
             postgres_dsn=require("POSTGRES_DSN"),
-            object_storage_bucket=require("OBJECT_STORAGE_BUCKET"), # NEED TO ADD IN .ENV FILE
+            object_storage_bucket=require("OBJECT_STORAGE_BUCKET"),
             otel_collector_endpoint=require("OTEL_COLLECTOR_ENDPOINT"),
             mtls_cert_file=os.getenv("MTLS_CERT_FILE", ""),
             mtls_key_file=os.getenv("MTLS_KEY_FILE", ""),
             mtls_ca_file=os.getenv("MTLS_CA_FILE", ""),
             allowed_callers=allowed_callers,
-            )
+        )
 
 
 

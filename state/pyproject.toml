@@ -20,7 +20,48 @@ dependencies = [
 aecp-platform = { path = "../platform", editable = true }
 
 [dependency-groups]
-dev = ["ruff>=0.7", "mypy>=1.13", "pytest>=8.3", "pytest-asyncio>=0.24"]
+dev = [
+    "ruff>=0.7",
+    "mypy>=1.13",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "types-protobuf>=5.29",
+    "types-grpcio>=1.68",
+    "types-grpcio-reflection>=1.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# Explicit, not just the editable install: this shell's Python build
+# silently skips .pth files whose names start with "_" (how uv's own
+# editable-install hooks are named), so aecp-platform's editable install
+# doesn't reliably land on sys.path without this.
+pythonpath = [".", "../platform"]
+
+[tool.ruff]
+# Generated code ("DO NOT EDIT" per protoc/buf) is not hand-maintained
+# and shouldn't be lint-gated; only app/*_pb2.py-adjacent packages match
+# this, never hand-written modules.
+extend-exclude = [
+    "app/agents/v1",
+    "app/common/v1",
+    "app/coordinator/v1",
+    "app/integration/v1",
+    "app/observability/v1",
+    "app/state/v1",
+    "app/taskgraph/v1",
+]
+
+[tool.mypy]
+exclude = [
+    "app/agents/v1",
+    "app/common/v1",
+    "app/coordinator/v1",
+    "app/integration/v1",
+    "app/observability/v1",
+    "app/state/v1",
+    "app/taskgraph/v1",
+]
 
 [build-system]
 requires = ["hatchling"]

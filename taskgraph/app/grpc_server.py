@@ -15,6 +15,7 @@ from grpc_reflection.v1alpha import reflection
 from app.common.v1 import common_pb2
 from app.graph import CycleDetectedError, DanglingDependencyError
 from app.interceptors import AllowListInterceptor
+from app.risk_tier import requires_human_approval
 from app.schema import DefinitionOfDone, OwnershipBoundary, RiskTier, TaskNode, TaskStatus
 from app.taskgraph.v1 import taskgraph_pb2, taskgraph_pb2_grpc
 
@@ -91,6 +92,10 @@ class TaskGraphServicer:
                 "risk_tier must be explicitly set; it is the primary lever for "
                 "human-in-the-loop cost control and has no safe default.",
             )
+        # context.abort() always raises (terminates the RPC) but grpc's own
+        # type stubs don't declare it NoReturn, so the checker can't see
+        # that on its own.
+        assert risk_tier is not None
 
         status = _TASK_STATUS_FROM_PROTO.get(proto_node.status, TaskStatus.PENDING)
         now = datetime.now(timezone.utc)
@@ -117,7 +122,14 @@ class TaskGraphServicer:
             definition_of_done=DefinitionOfDone(
                 required_checks=list(proto_node.definition_of_done.required_checks),
                 acceptance_criteria=list(proto_node.definition_of_done.acceptance_criteria),
-                requires_human_review_gate=proto_node.definition_of_done.requires_human_review_gate,
+                # The tier's own policy is authoritative here: a caller
+                # can request the gate for a lower tier too (leaving it
+                # False on their end doesn't turn it off for Structural/
+                # Architectural work — see risk_tier.requires_human_approval).
+                requires_human_review_gate=(
+                    proto_node.definition_of_done.requires_human_review_gate
+                    or requires_human_approval(risk_tier)
+                ),
             ),
             assigned_agent_id=proto_node.assigned_agent_id or None,
             created_at=now,

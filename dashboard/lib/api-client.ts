@@ -5,6 +5,8 @@
  * token, no direct calls to internal services.
  */
 
+const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? "";
+
 export interface TaskNode {
   taskId: string;
   title: string;
@@ -32,26 +34,131 @@ export interface Escalation {
   requestedRiskTier: string;
 }
 
+export interface InterfaceContract {
+  contractId: string;
+  name: string;
+  schema: string;
+  version: number;
+  frozen: boolean;
+}
+
+export interface CreateTaskInput {
+  title: string;
+  description?: string;
+  riskTier: string;
+  pathGlobs?: string[];
+}
+
+/**
+ * Raised for any non-2xx Gateway response. `status` lets callers
+ * distinguish "this endpoint isn't wired up yet" (501 — see
+ * gateway/app/routers/{agents,decisions,escalations}.py, which return a
+ * deliberate 501 naming the missing upstream RPC rather than a fake empty
+ * list) from a real failure (401/403/5xx), so pages can render an honest
+ * "not available yet" state instead of a generic error.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly detail: string;
+
+  constructor(status: number, detail: string) {
+    super(`Gateway request failed (${status}): ${detail}`);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${GATEWAY_URL}${path}`, {
+    ...init,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...init?.headers,
+    },
+  });
+
+  if (!response.ok) {
+    let detail = response.statusText;
+    try {
+      const body = (await response.json()) as { detail?: string };
+      if (body?.detail) {
+        detail = body.detail;
+      }
+    } catch {
+      // Non-JSON error body — fall back to statusText.
+    }
+    throw new ApiError(response.status, detail);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}
+
 export async function listReadyTasks(): Promise<TaskNode[]> {
-  throw new Error("not implemented");
+  return request<TaskNode[]>("/api/v1/tasks");
+}
+
+/**
+ * Beyond the original read-only contract this module started with:
+ * gateway's tasks router fully supports create + status update (the only
+ * router with a complete backing RPC end to end), so the Tasks page uses
+ * these to be a real, working view rather than list-only.
+ */
+export async function createTask(input: CreateTaskInput): Promise<TaskNode> {
+  return request<TaskNode>("/api/v1/tasks", {
+    method: "POST",
+    body: JSON.stringify({
+      title: input.title,
+      description: input.description ?? "",
+      risk_tier: input.riskTier,
+      path_globs: input.pathGlobs ?? [],
+    }),
+  });
+}
+
+export async function updateTaskStatus(
+  taskId: string,
+  status: string,
+  reason = "",
+): Promise<TaskNode> {
+  return request<TaskNode>(`/api/v1/tasks/${encodeURIComponent(taskId)}/status`, {
+    method: "POST",
+    body: JSON.stringify({ status, reason }),
+  });
+}
+
+export async function getInterfaceContract(contractId: string): Promise<InterfaceContract> {
+  return request<InterfaceContract>(
+    `/api/v1/decisions/contracts/${encodeURIComponent(contractId)}`,
+  );
 }
 
 export async function listAgentSessions(): Promise<AgentSession[]> {
-  throw new Error("not implemented");
+  return request<AgentSession[]>("/api/v1/agents");
 }
 
 export async function listDecisions(taskId?: string): Promise<DecisionLogEntry[]> {
-  throw new Error("not implemented");
+  const query = taskId ? `?task_id=${encodeURIComponent(taskId)}` : "";
+  return request<DecisionLogEntry[]>(`/api/v1/decisions${query}`);
 }
 
 export async function listPendingEscalations(): Promise<Escalation[]> {
-  throw new Error("not implemented");
+  return request<Escalation[]>("/api/v1/escalations");
 }
 
 export async function approveEscalation(taskId: string): Promise<void> {
-  throw new Error("not implemented");
+  await request<void>(`/api/v1/escalations/${encodeURIComponent(taskId)}/approve`, {
+    method: "POST",
+  });
 }
 
 export async function rejectEscalation(taskId: string): Promise<void> {
-  throw new Error("not implemented");
+  await request<void>(`/api/v1/escalations/${encodeURIComponent(taskId)}/reject`, {
+    method: "POST",
+  });
 }

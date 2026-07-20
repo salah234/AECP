@@ -1,0 +1,64 @@
+# Same template as gateway-deployment.yaml. Ingress is intentionally
+# wide open (any namespace may reach port 50051 to write audit events —
+# see networkpolicy/data-plane-edges.yaml's observability-ingress rule),
+# unlike every other internal service.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: observability
+  namespace: aecp
+  labels:
+    app.kubernetes.io/name: aecp
+    app.kubernetes.io/component: observability
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: observability
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: observability
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: observability
+          image: aecp/observability:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: 50056
+              name: grpc
+            - containerPort: 8086
+              name: http
+          envFrom:
+            - secretRef:
+                name: observability-env
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: observability
+  namespace: aecp
+spec:
+  selector:
+    app.kubernetes.io/component: observability
+  ports:
+    - port: 50056
+      targetPort: 50056
+      name: grpc
+    - port: 8086
+      targetPort: 8086
+      name: http
+  type: ClusterIP

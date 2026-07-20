@@ -1,0 +1,73 @@
+# Same template as gateway-deployment.yaml. Mounts an emptyDir for the
+# object-storage MVP path (platform/aecp_platform/storage/client.py is a
+# local-filesystem client) — this does not survive a pod restart or
+# support >1 replica sharing the same artifacts, matching that module's
+# own documented "MVP, later integrate 3rd party storage" scope. A real
+# deployment needs OBJECT_STORAGE_BUCKET pointed at a shared/cloud store
+# before scaling state beyond one replica.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: state
+  namespace: aecp
+  labels:
+    app.kubernetes.io/name: aecp
+    app.kubernetes.io/component: state
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: state
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: state
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: state
+          image: aecp/state:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: 50054
+              name: grpc
+            - containerPort: 8084
+              name: http
+          envFrom:
+            - secretRef:
+                name: state-env
+          volumeMounts:
+            - name: object-storage
+              mountPath: /var/lib/aecp/state-artifacts
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+      volumes:
+        - name: object-storage
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: state
+  namespace: aecp
+spec:
+  selector:
+    app.kubernetes.io/component: state
+  ports:
+    - port: 50054
+      targetPort: 50054
+      name: grpc
+    - port: 8084
+      targetPort: 8084
+      name: http
+  type: ClusterIP

@@ -9,6 +9,12 @@ FROM node:22-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY dashboard/ .
+# Next.js inlines NEXT_PUBLIC_* vars into the client bundle at build time,
+# not at container start — a plain runtime `environment:` entry in
+# docker-compose.yml never reaches this step, so it must come in as a
+# build ARG instead (docker-compose.yml passes it via `build.args`).
+ARG NEXT_PUBLIC_GATEWAY_URL
+ENV NEXT_PUBLIC_GATEWAY_URL=$NEXT_PUBLIC_GATEWAY_URL
 RUN npm run build
 
 FROM node:22-slim AS runtime
