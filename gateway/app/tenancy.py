@@ -8,16 +8,23 @@ performs that derivation and attaches it to outgoing internal gRPC calls.
 
 from __future__ import annotations
 
+from aecp_platform.errors import UnauthenticatedError
+
+TENANT_METADATA_KEY = "tenant-id"
+
 
 def tenant_from_session(session) -> str:
     """Return the tenant id to scope this request to. Raises if the
     session has no associated tenant.
     """
-    raise NotImplementedError
+    tenant_id = getattr(session, "tenant_id", None)
+    if not tenant_id:
+        raise UnauthenticatedError("Session carries no tenant_id")
+    return tenant_id
 
 
 def attach_tenant_metadata(grpc_call_metadata: list, tenant_id: str) -> list:
     """Append the tenant context to outgoing gRPC call metadata so
     downstream services can bind it via aecp_platform.dbtenant.
     """
-    raise NotImplementedError
+    return [*grpc_call_metadata, (TENANT_METADATA_KEY, tenant_id)]

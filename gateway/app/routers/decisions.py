@@ -5,16 +5,44 @@ recorded by services, never edited by humans through this API.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+import grpc
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.deps import RequestContext, get_clients, get_request_context
+from app.errors import grpc_error_to_http
+from app.schemas import interface_contract_to_dict
+from app.state.v1 import state_pb2
 
 router = APIRouter(prefix="/api/v1/decisions", tags=["decisions"])
 
 
 @router.get("")
-async def list_decisions(task_id: str | None = None):
-    raise NotImplementedError
+async def list_decisions(
+    task_id: str | None = None, ctx: RequestContext = Depends(get_request_context)
+):
+    # StateService exposes RecordDecision (write) and no query-by-tenant
+    # or query-by-task RPC (see docs/adr/0007's note on the same gap for
+    # HydrateContextResponse). Returning a fake empty list would read as
+    # "no decisions exist" rather than "not built yet" — see the gateway
+    # architecture plan's scope decision on gapped read endpoints.
+    raise HTTPException(
+        status_code=501,
+        detail="StateService has no ListDecisions RPC yet; this endpoint is not implemented.",
+    )
 
 
 @router.get("/contracts/{contract_id}")
-async def get_interface_contract(contract_id: str):
-    raise NotImplementedError
+async def get_interface_contract(
+    contract_id: str,
+    ctx: RequestContext = Depends(get_request_context),
+    clients=Depends(get_clients),
+):
+    try:
+        response = await clients.state().GetInterfaceContract(
+            state_pb2.GetInterfaceContractRequest(contract_id=contract_id),
+            metadata=clients.metadata(ctx.tenant_id),
+        )
+    except grpc.aio.AioRpcError as exc:
+        raise grpc_error_to_http(exc) from exc
+
+    return interface_contract_to_dict(response.contract)
