@@ -41,6 +41,7 @@ class Settings:
     mtls_cert_file: str
     mtls_key_file: str
     mtls_ca_file: str
+    dashboard_origin: str
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -79,4 +80,10 @@ class Settings:
             mtls_cert_file=os.getenv("MTLS_CERT_FILE", ""),
             mtls_key_file=os.getenv("MTLS_KEY_FILE", ""),
             mtls_ca_file=os.getenv("MTLS_CA_FILE", ""),
+            # The dashboard is a separate origin (different port), so the
+            # browser enforces CORS on every fetch from it — see main.py's
+            # CORSMiddleware. Not one of the `require()` fields above: an
+            # unset value shouldn't crash gateway boot, just default to the
+            # dashboard's dev origin.
+            dashboard_origin=os.getenv("DASHBOARD_ORIGIN", "http://localhost:3000"),
         )

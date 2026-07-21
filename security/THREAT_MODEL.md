@@ -110,3 +110,20 @@ Coordinator ── mediates ALL cross-service and cross-agent coordination
   place and are still real, correct behavior for a genuinely unreachable
   peer — they're simply no longer the *only* path exercised, now that
   both services actually run.
+- `gateway/app/main.py`'s `GET /auth/dev-login` mints a signed session
+  cookie without any OIDC round-trip, bypassing the "Human user
+  authenticates via OIDC" row in the actors table above. It exists only
+  to unblock local dashboard testing before a real IdP is configured
+  (`docs/adr/0006-secrets-management.md`/OIDC client registration are
+  both still open). Gated on `OIDC_CLIENT_SECRET` being exactly the
+  literal placeholder `changeme` shipped in `.env.example` — the route
+  returns 404 the moment a real secret is configured, so it cannot
+  activate in any environment that has actually set up OIDC. Every use
+  is logged at `WARNING`. This is still a real widening of the human
+  auth trust boundary while it exists (anyone who can reach gateway's
+  HTTP port in a misconfigured dev/staging environment could mint a
+  session for any subject/tenant/role), so it must be deleted — not just
+  left dormant — once `docs/adr/0006-secrets-management.md` lands and
+  real OIDC credentials are wired into every environment gateway ships
+  to. Do not copy this pattern into a shipped Helm chart or K8s manifest
+  default.

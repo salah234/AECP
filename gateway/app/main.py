@@ -14,10 +14,13 @@ requirement), not at import time.
 from __future__ import annotations
 
 import logging
+import os
 import secrets
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from aecp_platform.errors import PermissionDeniedError, UnauthenticatedError
@@ -58,6 +61,22 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="aecp-gateway", lifespan=lifespan)
+# The dashboard (localhost:3000) is a different origin than gateway
+# (localhost:8080) even in local dev, so the browser blocks every fetch
+# from it (surfacing as "Failed to fetch", not a readable HTTP error)
+# unless gateway explicitly allows it. allow_credentials=True is required
+# for the session cookie to be sent/received cross-origin, which in turn
+# requires an explicit origin here — "*" is rejected by browsers when
+# credentials are allowed. Read directly from the environment (not
+# Settings.from_env(), which only runs inside lifespan, after the app
+# object — and this middleware — must already exist).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[os.getenv("DASHBOARD_ORIGIN", "http://localhost:3000")],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(tasks.router)
 app.include_router(agents.router)
 app.include_router(decisions.router)
@@ -84,6 +103,58 @@ async def healthz() -> dict:
 async def readyz() -> dict:
     """Readiness probe: internal service clients are constructed."""
     return {"status": "ready" if _ready else "not_ready"}
+
+
+_DEV_OIDC_SECRET_PLACEHOLDER = "changeme"
+
+
+@app.get("/auth/dev-login")
+async def dev_login(
+    request: Request,
+    subject: str = "em-1",
+    tenant_id: str = "11111111-1111-1111-1111-111111111111",
+    role: str = "em",
+) -> RedirectResponse:
+    """DEV-ONLY session bypass, skipping the OIDC round-trip entirely.
+
+    Gated on OIDC_CLIENT_SECRET still being the literal placeholder value
+    from .env.example — the same signal that already means "no real IdP
+    is configured" everywhere else in this codebase. The moment a real
+    secret is set, this route 404s, so it cannot leak into any deployment
+    that has actually configured OIDC. This is a trust-boundary change
+    (CLAUDE.md Tier 3) scoped as tightly as possible; see
+    security/THREAT_MODEL.md for the corresponding entry.
+    """
+    settings = request.app.state.settings
+    if settings.oidc_client_secret_key != _DEV_OIDC_SECRET_PLACEHOLDER:
+        raise HTTPException(status_code=404)
+
+    logger.warning(
+        "DEV LOGIN BYPASS used: subject=%s tenant_id=%s role=%s — "
+        "never enabled outside local dev (see /auth/dev-login docstring)",
+        subject,
+        tenant_id,
+        role,
+    )
+
+    session = auth.Session(
+        subject=subject,
+        tenant_id=tenant_id,
+        role=role,
+        expires_at=(datetime.now(timezone.utc) + timedelta(seconds=_SESSION_MAX_AGE_SECONDS)).isoformat(),
+    )
+    cookie_value = auth.issue_session_cookie(session, settings.session_secret_key)
+
+    response = RedirectResponse(settings.dashboard_origin)
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        cookie_value,
+        max_age=_SESSION_MAX_AGE_SECONDS,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+    )
+    return response
 
 
 @app.get("/auth/login")
@@ -116,7 +187,9 @@ async def auth_callback(code: str, state: str, request: Request) -> RedirectResp
 
     cookie_value = auth.issue_session_cookie(session, request.app.state.settings.session_secret_key)
 
-    response = RedirectResponse("/")
+    # Gateway serves no browsable "/" of its own — the dashboard is the
+    # only human-facing page, and it lives at a different origin.
+    response = RedirectResponse(request.app.state.settings.dashboard_origin)
     response.delete_cookie(_OIDC_STATE_COOKIE_NAME)
     response.set_cookie(
         SESSION_COOKIE_NAME,
