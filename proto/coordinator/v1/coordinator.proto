@@ -4,7 +4,6 @@ package aecp.coordinator.v1;
 
 option go_package = "aecp/proto/coordinator/v1;coordinatorv1";
 
-import "google/protobuf/timestamp.proto";
 import "common/v1/common.proto";
 import "agents/v1/agents.proto";
 

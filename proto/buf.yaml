@@ -4,6 +4,13 @@ modules:
 lint:
   use:
     - STANDARD
+  except:
+    # Package is "aecp.<subsystem>.v1" but files live at "<subsystem>/v1/"
+    # (no "aecp/" directory prefix) to match the generated Python package
+    # layout every service imports from (e.g. `app.common.v1.common_pb2`).
+    # Moving directories to satisfy this rule would rewrite import paths
+    # across every backend service for no functional benefit.
+    - PACKAGE_DIRECTORY_MATCH
 breaking:
   use:
     - FILE
