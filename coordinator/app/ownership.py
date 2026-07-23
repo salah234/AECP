@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import fnmatch
 import posixpath
+from collections.abc import Iterable
 from functools import lru_cache
 from typing import Protocol
 
@@ -20,8 +21,8 @@ _GLOB_META = frozenset("*?[")
 
 
 class _OwnershipBoundaryLike(Protocol):
-    path_globs: object
-    forbidden_globs: object
+    path_globs: Iterable[str]
+    forbidden_globs: Iterable[str]
 
 
 def boundaries_overlap(a: _OwnershipBoundaryLike, b: _OwnershipBoundaryLike) -> bool:
@@ -193,7 +194,7 @@ def _has_matching_overlap_sample(
 
 
 def _sample_paths_for_glob(path_glob: str) -> set[str]:
-    samples = [()]
+    samples: list[tuple[str, ...]] = [()]
 
     for segment_glob in _split_glob(path_glob):
         if segment_glob == "**":

@@ -8,6 +8,7 @@ app.tenancy) against in-memory test doubles rather than a live topology.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -45,9 +46,11 @@ def settings() -> Settings:
     )
 
 
-class FakeStub:
+class FakeStub(SimpleNamespace):
     """A stand-in for a generated *Stub class: tests set whichever RPC
     method they need as an AsyncMock, e.g. stub.GetTaskNode = AsyncMock(...).
+    Subclasses SimpleNamespace so mypy allows the arbitrary attribute
+    assignment this pattern relies on.
     """
 
 

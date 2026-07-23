@@ -19,7 +19,15 @@ dependencies = [
 aecp-platform = { path = "../platform", editable = true }
 
 [dependency-groups]
-dev = ["ruff>=0.7", "mypy>=1.13", "pytest>=8.3", "pytest-asyncio>=0.24"]
+dev = [
+    "ruff>=0.7",
+    "mypy>=1.13",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "types-protobuf>=5.29",
+    "types-grpcio>=1.68",
+    "types-grpcio-reflection>=1.0",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "strict"
@@ -28,6 +36,61 @@ asyncio_mode = "strict"
 # editable-install hooks are named), so aecp-platform's editable install
 # doesn't reliably land on sys.path without this.
 pythonpath = [".", "../platform"]
+
+[tool.ruff]
+# Generated code ("DO NOT EDIT" per protoc/buf) is not hand-maintained
+# and shouldn't be lint-gated; only app/*_pb2.py-adjacent packages match
+# this, never hand-written modules.
+extend-exclude = [
+    "app/agents/v1",
+    "app/common/v1",
+    "app/coordinator/v1",
+    "app/integration/v1",
+    "app/observability/v1",
+    "app/state/v1",
+    "app/taskgraph/v1",
+]
+
+[tool.mypy]
+exclude = [
+    "app/agents/v1",
+    "app/common/v1",
+    "app/coordinator/v1",
+    "app/integration/v1",
+    "app/observability/v1",
+    "app/state/v1",
+    "app/taskgraph/v1",
+]
+
+# `exclude` above only keeps these generated packages from being
+# type-checked as root targets; mypy still follows the `from app.X.v1
+# import ...` imports our own hand-written modules make into them by
+# default, and since they're built at import time via
+# google.protobuf.internal.builder (no static attribute declarations),
+# that produces spurious "Module has no attribute" / "Name is not
+# defined" errors attributed to generated code we don't maintain and
+# were told not to regenerate. follow_imports = "skip" treats each as
+# Any at the import boundary instead, which keeps type-checking meaningful
+# for every hand-written call site (arguments/returns from our own
+# functions are still fully checked) without lint-gating generated code.
+[[tool.mypy.overrides]]
+module = [
+    "app.agents.v1.*",
+    "app.common.v1.*",
+    "app.coordinator.v1.*",
+    "app.integration.v1.*",
+    "app.observability.v1.*",
+    "app.state.v1.*",
+    "app.taskgraph.v1.*",
+]
+follow_imports = "skip"
+
+# aecp_platform ships no py.typed marker, so mypy can only ever report
+# "missing library stubs" for it, never a real finding about our code.
+# Silence that noise without turning off checking anywhere else.
+[[tool.mypy.overrides]]
+module = ["aecp_platform.*"]
+ignore_missing_imports = true
 
 [build-system]
 requires = ["hatchling"]

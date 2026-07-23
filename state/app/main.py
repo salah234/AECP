@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import cast
 
 import asyncpg
 import hypercorn.asyncio
@@ -10,6 +11,7 @@ from aecp_platform.dbtenant import TenantScopedPool
 from aecp_platform.telemetry import init_tracing, shutdown_tracing
 from fastapi import FastAPI
 from hypercorn.config import Config
+from hypercorn.typing import ASGIFramework
 
 from app.config import Settings
 from app.repository import StateRepository
@@ -127,7 +129,10 @@ async def serve_http() -> None:
     ]
 
     await hypercorn.asyncio.serve(
-        app,
+        # FastAPI/Starlette's __call__ is a valid ASGI3 app at runtime, but
+        # its signature is typed more loosely than hypercorn's ASGIFramework
+        # alias, so mypy doesn't structurally match them without this cast.
+        cast(ASGIFramework, app),
         config,
     )
 

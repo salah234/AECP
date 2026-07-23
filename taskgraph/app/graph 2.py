@@ -95,6 +95,9 @@ class TaskGraph:
         """
         
         nodes = await self.repository.list_by_tenant(tenant_id)
+        node_map = {
+            node.task_id: node for node in nodes
+        }
         graph = defaultdict(list)
         indegree = {
             node.task_id: 0

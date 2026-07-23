@@ -198,7 +198,7 @@ def _has_matching_overlap_sample(
 
 
 def _sample_paths_for_glob(path_glob: str) -> set[str]:
-    samples = [()]
+    samples: list[tuple[str, ...]] = [()]
 
     for segment_glob in _split_glob(path_glob):
         if segment_glob == "**":

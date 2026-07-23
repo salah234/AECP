@@ -68,3 +68,10 @@ exclude = [
     "app/state/v1",
     "app/taskgraph/v1",
 ]
+
+# aecp_platform ships no py.typed marker, so mypy can only ever report
+# "missing library stubs" for it, never a real finding about our code.
+# Silence that noise without turning off checking anywhere else.
+[[tool.mypy.overrides]]
+module = ["aecp_platform.*"]
+ignore_missing_imports = true
