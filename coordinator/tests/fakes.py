@@ -123,6 +123,7 @@ class FakeAgentPoolClient:
         self.spawned: list[dict] = []
         self.terminated: list[tuple[str, str]] = []
         self._fail_tenant_ids = fail_tenant_ids or set()
+        self._sessions: list = []
 
     async def spawn_session(
         self, *, tenant_id, task_id, granted_risk_tier, ownership, task_node_snapshot
@@ -142,11 +143,15 @@ class FakeAgentPoolClient:
         self.spawned.append(
             {"tenant_id": tenant_id, "task_id": task_id, "session_id": session.session_id}
         )
+        self._sessions.append(session)
         return session
 
     async def terminate_session(self, session_id: str, reason: str) -> bool:
         self.terminated.append((session_id, reason))
         return True
+
+    async def list_sessions(self, tenant_id: str) -> list:
+        return [s for s in self._sessions if s.tenant_id == tenant_id]
 
 
 class FakeIntegrationClient:

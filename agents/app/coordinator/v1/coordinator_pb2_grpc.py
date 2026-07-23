@@ -32,6 +32,16 @@ class CoordinatorServiceStub:
                 request_serializer=coordinator_dot_v1_dot_coordinator__pb2.ReportBlockerRequest.SerializeToString,
                 response_deserializer=coordinator_dot_v1_dot_coordinator__pb2.ReportBlockerResponse.FromString,
                 _registered_method=True)
+        self.ReportCompletion = channel.unary_unary(
+                '/aecp.coordinator.v1.CoordinatorService/ReportCompletion',
+                request_serializer=coordinator_dot_v1_dot_coordinator__pb2.ReportCompletionRequest.SerializeToString,
+                response_deserializer=coordinator_dot_v1_dot_coordinator__pb2.ReportCompletionResponse.FromString,
+                _registered_method=True)
+        self.ListAgentSessions = channel.unary_unary(
+                '/aecp.coordinator.v1.CoordinatorService/ListAgentSessions',
+                request_serializer=coordinator_dot_v1_dot_coordinator__pb2.ListAgentSessionsRequest.SerializeToString,
+                response_deserializer=coordinator_dot_v1_dot_coordinator__pb2.ListAgentSessionsResponse.FromString,
+                _registered_method=True)
 
 
 class CoordinatorServiceServicer:
@@ -64,6 +74,25 @@ class CoordinatorServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ReportCompletion(self, request, context):
+        """ReportCompletion is called by an agent session that finished its task.
+        Transitions the task to IN_REVIEW, not DONE — see
+        coordinator/app/tradeoff.py's report_completion for why.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListAgentSessions(self, request, context):
+        """ListAgentSessions is a read-only proxy over AgentPoolService.ListSessions:
+        Gateway has no network edge to Agent Pool (and never should, per
+        CLAUDE.md's "everything routes through the Coordinator"), so this is
+        how the dashboard's Agents page sees live session data.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_CoordinatorServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -81,6 +110,16 @@ def add_CoordinatorServiceServicer_to_server(servicer, server):
                     servicer.ReportBlocker,
                     request_deserializer=coordinator_dot_v1_dot_coordinator__pb2.ReportBlockerRequest.FromString,
                     response_serializer=coordinator_dot_v1_dot_coordinator__pb2.ReportBlockerResponse.SerializeToString,
+            ),
+            'ReportCompletion': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReportCompletion,
+                    request_deserializer=coordinator_dot_v1_dot_coordinator__pb2.ReportCompletionRequest.FromString,
+                    response_serializer=coordinator_dot_v1_dot_coordinator__pb2.ReportCompletionResponse.SerializeToString,
+            ),
+            'ListAgentSessions': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListAgentSessions,
+                    request_deserializer=coordinator_dot_v1_dot_coordinator__pb2.ListAgentSessionsRequest.FromString,
+                    response_serializer=coordinator_dot_v1_dot_coordinator__pb2.ListAgentSessionsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -167,6 +206,60 @@ class CoordinatorService:
             '/aecp.coordinator.v1.CoordinatorService/ReportBlocker',
             coordinator_dot_v1_dot_coordinator__pb2.ReportBlockerRequest.SerializeToString,
             coordinator_dot_v1_dot_coordinator__pb2.ReportBlockerResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReportCompletion(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/aecp.coordinator.v1.CoordinatorService/ReportCompletion',
+            coordinator_dot_v1_dot_coordinator__pb2.ReportCompletionRequest.SerializeToString,
+            coordinator_dot_v1_dot_coordinator__pb2.ReportCompletionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListAgentSessions(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/aecp.coordinator.v1.CoordinatorService/ListAgentSessions',
+            coordinator_dot_v1_dot_coordinator__pb2.ListAgentSessionsRequest.SerializeToString,
+            coordinator_dot_v1_dot_coordinator__pb2.ListAgentSessionsResponse.FromString,
             options,
             channel_credentials,
             insecure,

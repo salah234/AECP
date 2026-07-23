@@ -26,7 +26,7 @@ from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__
 from app.common.v1 import common_pb2 as common_dot_v1_dot_common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14state/v1/state.proto\x12\raecp.state.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16\x63ommon/v1/common.proto\"\x8c\x02\n\x10\x44\x65\x63isionLogEntry\x12\x19\n\x08\x65ntry_id\x18\x01 \x01(\tR\x07\x65ntryId\x12\x1b\n\ttenant_id\x18\x02 \x01(\tR\x08tenantId\x12\x17\n\x07task_id\x18\x03 \x01(\tR\x06taskId\x12\x18\n\x07summary\x18\x04 \x01(\tR\x07summary\x12\x1c\n\trationale\x18\x05 \x01(\tR\trationale\x12\x34\n\ndecided_by\x18\x06 \x01(\x0b\x32\x15.aecp.common.v1.ActorR\tdecidedBy\x12\x39\n\ndecided_at\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\tdecidedAt\"\xd9\x01\n\x0fOwnershipRecord\x12\x1b\n\ttenant_id\x18\x01 \x01(\tR\x08tenantId\x12\x1f\n\x0bmodule_path\x18\x02 \x01(\tR\nmodulePath\x12 \n\x0clast_task_id\x18\x03 \x01(\tR\nlastTaskId\x12\"\n\rlast_agent_id\x18\x04 \x01(\tR\x0blastAgentId\x12\x42\n\x0flast_touched_at\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\rlastTouchedAt\"\xaf\x01\n\x11InterfaceContract\x12\x1f\n\x0b\x63ontract_id\x18\x01 \x01(\tR\ncontractId\x12\x1b\n\ttenant_id\x18\x02 \x01(\tR\x08tenantId\x12\x12\n\x04name\x18\x03 \x01(\tR\x04name\x12\x16\n\x06schema\x18\x04 \x01(\tR\x06schema\x12\x18\n\x07version\x18\x05 \x01(\x05R\x07version\x12\x16\n\x06\x66rozen\x18\x06 \x01(\x08R\x06\x66rozen\"\xe3\x01\n\x0b\x44riftReport\x12\x1b\n\treport_id\x18\x01 \x01(\tR\x08reportId\x12\x1b\n\ttenant_id\x18\x02 \x01(\tR\x08tenantId\x12\x1f\n\x0b\x63ontract_id\x18\x03 \x01(\tR\ncontractId\x12 \n\x0b\x64\x65scription\x18\x04 \x01(\tR\x0b\x64\x65scription\x12\x1a\n\x08resolved\x18\x05 \x01(\x08R\x08resolved\x12;\n\x0b\x64\x65tected_at\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\ndetectedAt\"N\n\x15RecordDecisionRequest\x12\x35\n\x05\x65ntry\x18\x01 \x01(\x0b\x32\x1f.aecp.state.v1.DecisionLogEntryR\x05\x65ntry\"O\n\x16RecordDecisionResponse\x12\x35\n\x05\x65ntry\x18\x01 \x01(\x0b\x32\x1f.aecp.state.v1.DecisionLogEntryR\x05\x65ntry\"S\n\x13GetOwnershipRequest\x12\x1b\n\ttenant_id\x18\x01 \x01(\tR\x08tenantId\x12\x1f\n\x0bmodule_path\x18\x02 \x01(\tR\nmodulePath\"N\n\x14GetOwnershipResponse\x12\x36\n\x06record\x18\x01 \x01(\x0b\x32\x1e.aecp.state.v1.OwnershipRecordR\x06record\">\n\x1bGetInterfaceContractRequest\x12\x1f\n\x0b\x63ontract_id\x18\x01 \x01(\tR\ncontractId\"\\\n\x1cGetInterfaceContractResponse\x12<\n\x08\x63ontract\x18\x01 \x01(\x0b\x32 .aecp.state.v1.InterfaceContractR\x08\x63ontract\"H\n\x12ReportDriftRequest\x12\x32\n\x06report\x18\x01 \x01(\x0b\x32\x1a.aecp.state.v1.DriftReportR\x06report\"I\n\x13ReportDriftResponse\x12\x32\n\x06report\x18\x01 \x01(\x0b\x32\x1a.aecp.state.v1.DriftReportR\x06report2\x8d\x03\n\x0cStateService\x12]\n\x0eRecordDecision\x12$.aecp.state.v1.RecordDecisionRequest\x1a%.aecp.state.v1.RecordDecisionResponse\x12W\n\x0cGetOwnership\x12\".aecp.state.v1.GetOwnershipRequest\x1a#.aecp.state.v1.GetOwnershipResponse\x12o\n\x14GetInterfaceContract\x12*.aecp.state.v1.GetInterfaceContractRequest\x1a+.aecp.state.v1.GetInterfaceContractResponse\x12T\n\x0bReportDrift\x12!.aecp.state.v1.ReportDriftRequest\x1a\".aecp.state.v1.ReportDriftResponseB\x1dZ\x1b\x61\x65\x63p/proto/state/v1;statev1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14state/v1/state.proto\x12\raecp.state.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16\x63ommon/v1/common.proto\"\x8c\x02\n\x10\x44\x65\x63isionLogEntry\x12\x19\n\x08\x65ntry_id\x18\x01 \x01(\tR\x07\x65ntryId\x12\x1b\n\ttenant_id\x18\x02 \x01(\tR\x08tenantId\x12\x17\n\x07task_id\x18\x03 \x01(\tR\x06taskId\x12\x18\n\x07summary\x18\x04 \x01(\tR\x07summary\x12\x1c\n\trationale\x18\x05 \x01(\tR\trationale\x12\x34\n\ndecided_by\x18\x06 \x01(\x0b\x32\x15.aecp.common.v1.ActorR\tdecidedBy\x12\x39\n\ndecided_at\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\tdecidedAt\"\xd9\x01\n\x0fOwnershipRecord\x12\x1b\n\ttenant_id\x18\x01 \x01(\tR\x08tenantId\x12\x1f\n\x0bmodule_path\x18\x02 \x01(\tR\nmodulePath\x12 \n\x0clast_task_id\x18\x03 \x01(\tR\nlastTaskId\x12\"\n\rlast_agent_id\x18\x04 \x01(\tR\x0blastAgentId\x12\x42\n\x0flast_touched_at\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\rlastTouchedAt\"\xaf\x01\n\x11InterfaceContract\x12\x1f\n\x0b\x63ontract_id\x18\x01 \x01(\tR\ncontractId\x12\x1b\n\ttenant_id\x18\x02 \x01(\tR\x08tenantId\x12\x12\n\x04name\x18\x03 \x01(\tR\x04name\x12\x16\n\x06schema\x18\x04 \x01(\tR\x06schema\x12\x18\n\x07version\x18\x05 \x01(\x05R\x07version\x12\x16\n\x06\x66rozen\x18\x06 \x01(\x08R\x06\x66rozen\"\xe3\x01\n\x0b\x44riftReport\x12\x1b\n\treport_id\x18\x01 \x01(\tR\x08reportId\x12\x1b\n\ttenant_id\x18\x02 \x01(\tR\x08tenantId\x12\x1f\n\x0b\x63ontract_id\x18\x03 \x01(\tR\ncontractId\x12 \n\x0b\x64\x65scription\x18\x04 \x01(\tR\x0b\x64\x65scription\x12\x1a\n\x08resolved\x18\x05 \x01(\x08R\x08resolved\x12;\n\x0b\x64\x65tected_at\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.TimestampR\ndetectedAt\"N\n\x15RecordDecisionRequest\x12\x35\n\x05\x65ntry\x18\x01 \x01(\x0b\x32\x1f.aecp.state.v1.DecisionLogEntryR\x05\x65ntry\"O\n\x16RecordDecisionResponse\x12\x35\n\x05\x65ntry\x18\x01 \x01(\x0b\x32\x1f.aecp.state.v1.DecisionLogEntryR\x05\x65ntry\"b\n\x14ListDecisionsRequest\x12\x1b\n\ttenant_id\x18\x01 \x01(\tR\x08tenantId\x12\x17\n\x07task_id\x18\x02 \x01(\tR\x06taskId\x12\x14\n\x05limit\x18\x03 \x01(\x05R\x05limit\"R\n\x15ListDecisionsResponse\x12\x39\n\x07\x65ntries\x18\x01 \x03(\x0b\x32\x1f.aecp.state.v1.DecisionLogEntryR\x07\x65ntries\"S\n\x13GetOwnershipRequest\x12\x1b\n\ttenant_id\x18\x01 \x01(\tR\x08tenantId\x12\x1f\n\x0bmodule_path\x18\x02 \x01(\tR\nmodulePath\"N\n\x14GetOwnershipResponse\x12\x36\n\x06record\x18\x01 \x01(\x0b\x32\x1e.aecp.state.v1.OwnershipRecordR\x06record\">\n\x1bGetInterfaceContractRequest\x12\x1f\n\x0b\x63ontract_id\x18\x01 \x01(\tR\ncontractId\"\\\n\x1cGetInterfaceContractResponse\x12<\n\x08\x63ontract\x18\x01 \x01(\x0b\x32 .aecp.state.v1.InterfaceContractR\x08\x63ontract\"H\n\x12ReportDriftRequest\x12\x32\n\x06report\x18\x01 \x01(\x0b\x32\x1a.aecp.state.v1.DriftReportR\x06report\"I\n\x13ReportDriftResponse\x12\x32\n\x06report\x18\x01 \x01(\x0b\x32\x1a.aecp.state.v1.DriftReportR\x06report2\xe9\x03\n\x0cStateService\x12]\n\x0eRecordDecision\x12$.aecp.state.v1.RecordDecisionRequest\x1a%.aecp.state.v1.RecordDecisionResponse\x12Z\n\rListDecisions\x12#.aecp.state.v1.ListDecisionsRequest\x1a$.aecp.state.v1.ListDecisionsResponse\x12W\n\x0cGetOwnership\x12\".aecp.state.v1.GetOwnershipRequest\x1a#.aecp.state.v1.GetOwnershipResponse\x12o\n\x14GetInterfaceContract\x12*.aecp.state.v1.GetInterfaceContractRequest\x1a+.aecp.state.v1.GetInterfaceContractResponse\x12T\n\x0bReportDrift\x12!.aecp.state.v1.ReportDriftRequest\x1a\".aecp.state.v1.ReportDriftResponseB\x1dZ\x1b\x61\x65\x63p/proto/state/v1;statev1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -46,18 +46,22 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_RECORDDECISIONREQUEST']._serialized_end=1073
   _globals['_RECORDDECISIONRESPONSE']._serialized_start=1075
   _globals['_RECORDDECISIONRESPONSE']._serialized_end=1154
-  _globals['_GETOWNERSHIPREQUEST']._serialized_start=1156
-  _globals['_GETOWNERSHIPREQUEST']._serialized_end=1239
-  _globals['_GETOWNERSHIPRESPONSE']._serialized_start=1241
-  _globals['_GETOWNERSHIPRESPONSE']._serialized_end=1319
-  _globals['_GETINTERFACECONTRACTREQUEST']._serialized_start=1321
-  _globals['_GETINTERFACECONTRACTREQUEST']._serialized_end=1383
-  _globals['_GETINTERFACECONTRACTRESPONSE']._serialized_start=1385
-  _globals['_GETINTERFACECONTRACTRESPONSE']._serialized_end=1477
-  _globals['_REPORTDRIFTREQUEST']._serialized_start=1479
-  _globals['_REPORTDRIFTREQUEST']._serialized_end=1551
-  _globals['_REPORTDRIFTRESPONSE']._serialized_start=1553
-  _globals['_REPORTDRIFTRESPONSE']._serialized_end=1626
-  _globals['_STATESERVICE']._serialized_start=1629
-  _globals['_STATESERVICE']._serialized_end=2026
+  _globals['_LISTDECISIONSREQUEST']._serialized_start=1156
+  _globals['_LISTDECISIONSREQUEST']._serialized_end=1254
+  _globals['_LISTDECISIONSRESPONSE']._serialized_start=1256
+  _globals['_LISTDECISIONSRESPONSE']._serialized_end=1338
+  _globals['_GETOWNERSHIPREQUEST']._serialized_start=1340
+  _globals['_GETOWNERSHIPREQUEST']._serialized_end=1423
+  _globals['_GETOWNERSHIPRESPONSE']._serialized_start=1425
+  _globals['_GETOWNERSHIPRESPONSE']._serialized_end=1503
+  _globals['_GETINTERFACECONTRACTREQUEST']._serialized_start=1505
+  _globals['_GETINTERFACECONTRACTREQUEST']._serialized_end=1567
+  _globals['_GETINTERFACECONTRACTRESPONSE']._serialized_start=1569
+  _globals['_GETINTERFACECONTRACTRESPONSE']._serialized_end=1661
+  _globals['_REPORTDRIFTREQUEST']._serialized_start=1663
+  _globals['_REPORTDRIFTREQUEST']._serialized_end=1735
+  _globals['_REPORTDRIFTRESPONSE']._serialized_start=1737
+  _globals['_REPORTDRIFTRESPONSE']._serialized_end=1810
+  _globals['_STATESERVICE']._serialized_start=1813
+  _globals['_STATESERVICE']._serialized_end=2302
 # @@protoc_insertion_point(module_scope)

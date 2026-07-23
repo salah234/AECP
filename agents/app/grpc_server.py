@@ -8,6 +8,7 @@ from typing import cast
 
 import grpc
 import grpc.aio
+from aecp_platform.tracing_grpc import TracingServerInterceptor
 from grpc_reflection.v1alpha import reflection
 
 from app.agents.v1 import agents_pb2, agents_pb2_grpc
@@ -20,11 +21,14 @@ class AgentPoolServicer:
     (see proto/agents/v1/agents.proto).
     """
 
-    def __init__(self, lifecycle_manager, hydrator, handoff_coordinator, pool=None) -> None:
+    def __init__(
+        self, lifecycle_manager, hydrator, handoff_coordinator, pool=None, executor=None
+    ) -> None:
         self.lifecycle_manager = lifecycle_manager
         self.hydrator = hydrator
         self.handoff_coordinator = handoff_coordinator
         self.pool = pool
+        self.executor = executor
 
     async def SpawnSession(self, request, context):
         if not request.tenant_id:
@@ -61,6 +65,14 @@ class AgentPoolServicer:
             if self.pool is not None:
                 await self.pool.release_slot(request.tenant_id)
             raise
+
+        if self.executor is not None:
+            handle = await self.lifecycle_manager.get_sandbox_handle(session.session_id)
+            if handle is not None:
+                # Deliberately not awaited: SpawnSession's RPC latency
+                # must stay bounded by sandbox+identity provisioning
+                # only, not an entire claude run (see executor.py).
+                self.executor.spawn_background(session, handle.scratch_dir)
 
         return agents_pb2.SpawnSessionResponse(session=_session_to_proto(session))
 
@@ -119,6 +131,15 @@ class AgentPoolServicer:
 
         return agents_pb2.TerminateSessionResponse(terminated=True)
 
+    async def ListSessions(self, request, context):
+        if not request.tenant_id:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "tenant_id is required")
+
+        sessions = await self.lifecycle_manager.list_active(request.tenant_id)
+        return agents_pb2.ListSessionsResponse(
+            sessions=[_session_to_proto(s) for s in sessions]
+        )
+
 
 def _session_to_proto(session) -> agents_pb2.AgentSession:
     proto_session = agents_pb2.AgentSession(
@@ -166,7 +187,9 @@ def build_server(
     """Construct a grpc.aio.Server bound to the given servicer, with the
     mTLS server credentials and caller allow-list interceptor applied.
     """
-    server = grpc.aio.server(interceptors=[AllowListInterceptor(allow_list)])
+    server = grpc.aio.server(
+        interceptors=[TracingServerInterceptor(), AllowListInterceptor(allow_list)]
+    )
 
     agents_pb2_grpc.add_AgentPoolServiceServicer_to_server(servicer, server)
 

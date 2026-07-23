@@ -69,11 +69,12 @@ async def test_record_decision_round_trips_and_converts_actor_kind() -> None:
     assert response.entry.decided_by.id == "agent-1"
     assert response.entry.decided_by.kind == common_pb2.Actor.Kind.KIND_AGENT
 
-    # Persisted with the proto enum converted to its string name, per
-    # DecisionLogEntry.decided_by_kind.
+    # Persisted as the short form decision_log_entries' CHECK constraint
+    # requires (state/migrations/0001_state_layer.sql), not the proto
+    # enum's own name — see grpc_server.py's _ACTOR_KIND_TO_DB.
     assert len(repository.decisions) == 1
     stored = repository.decisions[0]
-    assert stored.decided_by_kind == "KIND_AGENT"
+    assert stored.decided_by_kind == "agent"
     assert stored.decided_by_id == "agent-1"
     assert stored.tenant_id == TENANT_ID
 
@@ -99,7 +100,111 @@ async def test_record_decision_converts_human_actor_kind() -> None:
 
     await servicer.RecordDecision(request, context)
 
-    assert repository.decisions[0].decided_by_kind == "KIND_HUMAN"
+    assert repository.decisions[0].decided_by_kind == "human"
+
+
+async def test_record_decision_requires_explicit_actor_kind() -> None:
+    servicer, repository = make_servicer()
+    context = FakeContext()
+
+    request = state_pb2.RecordDecisionRequest(
+        entry=state_pb2.DecisionLogEntry(
+            entry_id="entry-3",
+            tenant_id=TENANT_ID,
+            task_id="task-1",
+            summary="Unattributed",
+            rationale="No actor kind set.",
+            decided_by=common_pb2.Actor(id="mystery-1"),  # kind left UNSPECIFIED
+        )
+    )
+    request.entry.decided_at.FromDatetime(datetime.now(timezone.utc))
+
+    with pytest.raises(AbortedRPC) as exc_info:
+        await servicer.RecordDecision(request, context)
+
+    assert exc_info.value.code == grpc.StatusCode.INVALID_ARGUMENT
+    assert repository.decisions == []
+
+
+# -- ListDecisions --------------------------------------------------
+
+
+async def _record(servicer, context, *, entry_id, task_id, kind, summary="summary") -> None:
+    request = state_pb2.RecordDecisionRequest(
+        entry=state_pb2.DecisionLogEntry(
+            entry_id=entry_id,
+            tenant_id=TENANT_ID,
+            task_id=task_id,
+            summary=summary,
+            rationale="rationale",
+            decided_by=common_pb2.Actor(kind=kind, id="actor-1"),
+        )
+    )
+    request.entry.decided_at.FromDatetime(datetime.now(timezone.utc))
+    await servicer.RecordDecision(request, context)
+
+
+async def test_list_decisions_filters_by_task_id() -> None:
+    servicer, _repository = make_servicer()
+    context = FakeContext()
+
+    await _record(servicer, context, entry_id="e1", task_id="task-1", kind=common_pb2.Actor.KIND_AGENT)
+    await _record(servicer, context, entry_id="e2", task_id="task-2", kind=common_pb2.Actor.KIND_AGENT)
+
+    response = await servicer.ListDecisions(
+        state_pb2.ListDecisionsRequest(tenant_id=TENANT_ID, task_id="task-1"), context
+    )
+
+    assert [e.entry_id for e in response.entries] == ["e1"]
+
+
+async def test_list_decisions_without_task_id_returns_recent_across_tenant() -> None:
+    servicer, _repository = make_servicer()
+    context = FakeContext()
+
+    await _record(servicer, context, entry_id="e1", task_id="task-1", kind=common_pb2.Actor.KIND_AGENT)
+    await _record(servicer, context, entry_id="e2", task_id="task-2", kind=common_pb2.Actor.KIND_HUMAN)
+
+    response = await servicer.ListDecisions(
+        state_pb2.ListDecisionsRequest(tenant_id=TENANT_ID), context
+    )
+
+    assert {e.entry_id for e in response.entries} == {"e1", "e2"}
+
+
+async def test_list_decisions_round_trips_actor_kind_through_db_short_form() -> None:
+    """Regression test for the decided_by_kind bug this session: RecordDecision
+    writes the DB's short form ('agent'/'human'/'coordinator'), and
+    ListDecisions must convert it back to the correct proto Actor.Kind, not
+    just default everything to UNSPECIFIED/AGENT.
+    """
+    servicer, _repository = make_servicer()
+    context = FakeContext()
+
+    await _record(servicer, context, entry_id="e1", task_id="task-1", kind=common_pb2.Actor.KIND_HUMAN)
+    await _record(servicer, context, entry_id="e2", task_id="task-1", kind=common_pb2.Actor.KIND_COORDINATOR)
+
+    response = await servicer.ListDecisions(
+        state_pb2.ListDecisionsRequest(tenant_id=TENANT_ID, task_id="task-1"), context
+    )
+
+    kinds_by_id = {e.entry_id: e.decided_by.kind for e in response.entries}
+    assert kinds_by_id["e1"] == common_pb2.Actor.KIND_HUMAN
+    assert kinds_by_id["e2"] == common_pb2.Actor.KIND_COORDINATOR
+
+
+async def test_list_decisions_respects_explicit_limit() -> None:
+    servicer, _repository = make_servicer()
+    context = FakeContext()
+
+    for i in range(5):
+        await _record(servicer, context, entry_id=f"e{i}", task_id="task-1", kind=common_pb2.Actor.KIND_AGENT)
+
+    response = await servicer.ListDecisions(
+        state_pb2.ListDecisionsRequest(tenant_id=TENANT_ID, limit=2), context
+    )
+
+    assert len(response.entries) == 2
 
 
 # -- GetOwnership --------------------------------------------------

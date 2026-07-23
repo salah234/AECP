@@ -140,3 +140,56 @@ async def test_report_blocker_is_audited_as_not_security_relevant() -> None:
 
     assert len(audit_client.recorded_events) == 1
     assert audit_client.recorded_events[0]["security_relevant"] is False
+
+
+@pytest.mark.asyncio
+async def test_report_completion_moves_task_to_in_review() -> None:
+    node = make_task_node()
+    taskgraph_client = FakeTaskGraphClient([node])
+    resolver = TradeoffResolver(FakeStateClient(), FakeAuditClient(), taskgraph_client)
+
+    await resolver.report_completion(
+        node.task_id, node.tenant_id, "session-1", "Added retry logic", "Used exponential backoff"
+    )
+
+    assert len(taskgraph_client.status_updates) == 1
+    _task_id, status, _reason = taskgraph_client.status_updates[0]
+    assert status == common_pb2.TASK_STATUS_IN_REVIEW
+
+
+@pytest.mark.asyncio
+async def test_report_completion_unknown_task_raises() -> None:
+    resolver = TradeoffResolver(FakeStateClient(), FakeAuditClient(), FakeTaskGraphClient([]))
+
+    with pytest.raises(ValueError):
+        await resolver.report_completion("missing", "tenant-1", "session-1", "summary", "rationale")
+
+
+@pytest.mark.asyncio
+async def test_report_completion_is_audited_as_not_security_relevant() -> None:
+    node = make_task_node()
+    audit_client = FakeAuditClient()
+    resolver = TradeoffResolver(FakeStateClient(), audit_client, FakeTaskGraphClient([node]))
+
+    await resolver.report_completion(node.task_id, node.tenant_id, "session-1", "summary", "rationale")
+
+    assert len(audit_client.recorded_events) == 1
+    assert audit_client.recorded_events[0]["security_relevant"] is False
+
+
+@pytest.mark.asyncio
+async def test_report_completion_records_decision_with_agent_actor() -> None:
+    node = make_task_node()
+    state_client = FakeStateClient()
+    resolver = TradeoffResolver(state_client, FakeAuditClient(), FakeTaskGraphClient([node]))
+
+    await resolver.report_completion(
+        node.task_id, node.tenant_id, "session-1", "Added retry logic", "Used exponential backoff"
+    )
+
+    assert len(state_client.recorded_decisions) == 1
+    decision = state_client.recorded_decisions[0]
+    assert decision["summary"] == "Added retry logic"
+    assert decision["rationale"] == "Used exponential backoff"
+    assert decision["decided_by_kind"] == common_pb2.Actor.KIND_AGENT
+    assert decision["decided_by_id"] == "session-1"

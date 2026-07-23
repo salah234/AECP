@@ -136,3 +136,102 @@ async def test_count_active_scopes_by_tenant() -> None:
     assert await manager.count_active(TENANT_ID) == 1
     assert await manager.count_active("other-tenant") == 1
     assert await manager.count_active("no-sessions") == 0
+
+
+async def test_list_active_scopes_by_tenant() -> None:
+    manager, _sandbox, _identity_issuer = make_manager()
+
+    mine = await manager.spawn(
+        tenant_id=TENANT_ID,
+        task_id="t1",
+        granted_risk_tier="RISK_TIER_LOCAL",
+        ownership_globs=[],
+        ownership_boundary=b"",
+        task_node_snapshot=b"",
+    )
+    await manager.spawn(
+        tenant_id="other-tenant",
+        task_id="t2",
+        granted_risk_tier="RISK_TIER_LOCAL",
+        ownership_globs=[],
+        ownership_boundary=b"",
+        task_node_snapshot=b"",
+    )
+
+    sessions = await manager.list_active(TENANT_ID)
+
+    assert [s.session_id for s in sessions] == [mine.session_id]
+    assert await manager.list_active("no-sessions") == []
+
+
+async def test_get_sandbox_handle_returns_the_handle_from_spawn() -> None:
+    manager, _sandbox, _identity_issuer = make_manager()
+
+    session = await manager.spawn(
+        tenant_id=TENANT_ID,
+        task_id=TASK_ID,
+        granted_risk_tier="RISK_TIER_LOCAL",
+        ownership_globs=[],
+        ownership_boundary=b"",
+        task_node_snapshot=b"",
+    )
+
+    handle = await manager.get_sandbox_handle(session.session_id)
+    assert handle is not None
+    assert handle.session_id == session.session_id
+
+    await manager.terminate(session.session_id, reason="done")
+    assert await manager.get_sandbox_handle(session.session_id) is None
+
+
+async def test_terminate_invokes_execution_canceller_before_sandbox_destroy() -> None:
+    manager, sandbox, _identity_issuer = make_manager()
+    calls: list[str] = []
+
+    async def canceller(session_id: str) -> None:
+        calls.append(session_id)
+        assert session_id not in sandbox.destroyed, (
+            "execution_canceller must run before sandbox.destroy(), so a live "
+            "subprocess is never left writing into a deleted scratch dir"
+        )
+
+    manager.execution_canceller = canceller
+
+    session = await manager.spawn(
+        tenant_id=TENANT_ID,
+        task_id=TASK_ID,
+        granted_risk_tier="RISK_TIER_LOCAL",
+        ownership_globs=[],
+        ownership_boundary=b"",
+        task_node_snapshot=b"",
+    )
+    await manager.terminate(session.session_id, reason="done")
+
+    assert calls == [session.session_id]
+    assert session.session_id in sandbox.destroyed
+
+
+async def test_reap_expired_invokes_execution_canceller() -> None:
+    clock = {"now": datetime(2026, 1, 1, tzinfo=timezone.utc)}
+    manager, _sandbox, _identity_issuer = make_manager(now_fn=lambda: clock["now"], ttl=60)
+    calls: list[str] = []
+
+    async def canceller(session_id: str) -> None:
+        calls.append(session_id)
+
+    manager.execution_canceller = canceller
+
+    session = await manager.spawn(
+        tenant_id=TENANT_ID,
+        task_id=TASK_ID,
+        granted_risk_tier="RISK_TIER_LOCAL",
+        ownership_globs=[],
+        ownership_boundary=b"",
+        task_node_snapshot=b"",
+    )
+    clock["now"] += timedelta(seconds=65)
+
+    expired = await manager.reap_expired()
+
+    assert {s.session_id for s in expired} == {session.session_id}
+    assert calls == [session.session_id]

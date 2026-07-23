@@ -61,6 +61,16 @@ Coordinator ── mediates ALL cross-service and cross-agent coordination
    Mitigated by the audit_events table being append-only at the database
    role level (see `observability/migrations/0001_audit_trail.sql`), not
    just by application code discipline.
+7. **A malicious or adversarial task prompt causing an agent session's
+   real `claude` subprocess (`agents/app/executor.py`) to act beyond its
+   intended scope.** No per-session process/filesystem isolation exists
+   yet (`agents/app/sandbox.py` remains the explicitly non-isolating
+   placeholder; see the matching Open item below and ADR-0009). Mitigated
+   today by a restrictive `--permission-mode`/`--allowedTools` default, a
+   `git worktree`/cwd boundary, an execution timeout, and a minimal
+   explicit subprocess environment — all reducing blast radius *within*
+   the Agent Pool container, not eliminating it. This is the threat
+   ADR-0009's eventual decision must close.
 
 ## Open items
 
@@ -69,11 +79,34 @@ Coordinator ── mediates ALL cross-service and cross-agent coordination
   decision; see `docs/adr/0009-agent-sandbox-isolation-technology.md`
   (proposal, decision not yet made). `agents/app/sandbox.py`'s current
   `Sandbox` class is explicitly a non-isolating dev/test placeholder
-  (scratch directory only, no process/filesystem/network isolation) so
-  the rest of Agent Pool (spawn, handoff, teardown, capacity accounting)
-  could be implemented and tested end-to-end without blocking on this
-  decision. Do not treat it as a security boundary; it is load-bearing
-  for nothing in this table.
+  (scratch directory only, no process/filesystem/network isolation). It
+  now has a real, non-simulated consumer: `agents/app/executor.py` runs
+  the actual `claude` CLI as a subprocess with real tool access (file
+  edits, `git`, shell commands) inside that scratch directory — this was
+  always the eventual shape of the "Agent Session" trust boundary in the
+  actors table above, but it goes from theoretical to load-bearing the
+  moment a real subprocess with real tool access runs. Concretely: this
+  subprocess executes with no per-session process/filesystem isolation,
+  inside the *same OS process/filesystem the Agent Pool container itself
+  runs in* — a compromised or adversarial task prompt could act with
+  whatever privileges that container has. v1 mitigations, all enforced in
+  `executor.py`: `--permission-mode acceptEdits` (never
+  `--allow-dangerously-skip-permissions`/`bypassPermissions`), `--add-dir`
+  and `cwd` scoped to the session's own `git worktree` only, a restrictive
+  `--allowedTools` default (`Read Edit Write Bash(git *)`, no
+  network-capable tools), a wall-clock execution timeout
+  (`AGENT_EXECUTION_TIMEOUT_SECONDS`), and a minimal explicit subprocess
+  `env` (`HOME`/`PATH`/`ANTHROPIC_API_KEY` only — never the parent
+  process's full `os.environ`, which may carry mTLS file paths and other
+  internal config). `claude`'s stdout/stderr is truncated
+  (`_MAX_REPORTED_OUTPUT_CHARS`) before it ever leaves the process via a
+  `ReportBlocker`/`ReportCompletion` RPC payload, consistent with threat
+  #4 below. None of this is a substitute for ADR-0009's isolation
+  decision — this feature raises that ADR's urgency, it does not resolve
+  it. The rest of Agent Pool (spawn, handoff, teardown, capacity
+  accounting) was already implemented and tested end-to-end without
+  blocking on that decision; real execution is the same story, not a
+  change to it.
 - Agent session credentials (`agents/app/identity.py`) are HMAC-signed
   opaque tokens, not real mTLS client certificates — an interim scheme
   pending real certificate issuance; see

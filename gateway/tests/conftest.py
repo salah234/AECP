@@ -41,6 +41,7 @@ def settings() -> Settings:
         mtls_cert_file="",
         mtls_key_file="",
         mtls_ca_file="",
+        dashboard_origin="http://localhost:3000",
     )
 
 

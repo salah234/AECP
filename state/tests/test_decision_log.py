@@ -28,7 +28,7 @@ def make_entry(
         task_id=task_id,
         summary=summary,
         rationale="Full explanation goes here.",
-        decided_by_kind="KIND_AGENT",
+        decided_by_kind="agent",  # DB's short form (grpc_server.py's _ACTOR_KIND_TO_DB), not the proto enum name
         decided_by_id="agent-42",
         decided_at=decided_at or datetime.now(UTC),
         supersedes_entry_id=supersedes_entry_id,
@@ -154,3 +154,32 @@ async def test_history_for_module_only_reflects_last_touch_not_full_history() ->
     # entry-1 (task-1's decision) is no longer visible, even though task-1
     # really did touch this module at some point.
     assert [entry.entry_id for entry in second_pass] == ["entry-2"]
+
+
+async def test_recent_returns_entries_newest_first() -> None:
+    repository = FakeStateRepository()
+    log = DecisionLog(repository)
+
+    now = datetime.now(UTC)
+    older = make_entry(entry_id="entry-1", task_id="task-1", decided_at=now)
+    newer = make_entry(entry_id="entry-2", task_id="task-2", decided_at=now + timedelta(minutes=5))
+
+    await log.record(older)
+    await log.record(newer)
+
+    recent = await log.recent(limit=50)
+
+    assert [entry.entry_id for entry in recent] == ["entry-2", "entry-1"]
+
+
+async def test_recent_respects_limit() -> None:
+    repository = FakeStateRepository()
+    log = DecisionLog(repository)
+
+    now = datetime.now(UTC)
+    for i in range(5):
+        await log.record(make_entry(entry_id=f"entry-{i}", decided_at=now + timedelta(minutes=i)))
+
+    recent = await log.recent(limit=2)
+
+    assert [entry.entry_id for entry in recent] == ["entry-4", "entry-3"]

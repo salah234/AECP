@@ -7,6 +7,7 @@ import asyncio
 import asyncpg
 import uvicorn
 from aecp_platform.dbtenant import TenantScopedPool
+from aecp_platform.telemetry import init_tracing, shutdown_tracing
 from fastapi import FastAPI
 from fastapi.responses import Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -91,8 +92,13 @@ def main() -> None:
     """Load Settings, init telemetry, and run the HTTP health server and
     gRPC server concurrently.
     """
+    settings = Settings.from_env()
+    init_tracing(service_name="observability", collector_endpoint=settings.otel_collector_endpoint)
     register_metrics()
-    asyncio.run(run())
+    try:
+        asyncio.run(run())
+    finally:
+        shutdown_tracing()
 
 
 if __name__ == "__main__":

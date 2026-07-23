@@ -131,6 +131,36 @@ async def test_get_decisions_by_task_empty_when_no_rows() -> None:
     assert await repository.get_decisions_by_task("task-1") == []
 
 
+async def test_get_recent_decisions_maps_rows_and_passes_limit() -> None:
+    now = datetime.now(timezone.utc)
+    expected = DecisionLogEntry(
+        entry_id="entry-1",
+        tenant_id=TENANT_ID,
+        task_id="task-1",
+        summary="summary",
+        rationale="rationale",
+        decided_by_kind="agent",
+        decided_by_id="agent-1",
+        decided_at=now,
+        supersedes_entry_id=None,
+    )
+    conn = _QueuedConnection(fetch_results=[[vars(expected)]])
+    repository = make_repository(conn)
+
+    entries = await repository.get_recent_decisions(10)
+
+    assert entries == [expected]
+    _query, args = conn.fetch_calls[0]
+    assert args == (10,)
+
+
+async def test_get_recent_decisions_empty_when_no_rows() -> None:
+    conn = _QueuedConnection(fetch_results=[[]])
+    repository = make_repository(conn)
+
+    assert await repository.get_recent_decisions(50) == []
+
+
 async def test_get_decisions_for_module_returns_empty_without_ownership_record() -> None:
     conn = _QueuedConnection(fetchrow_results=[None])
     repository = make_repository(conn)

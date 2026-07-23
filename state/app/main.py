@@ -7,6 +7,7 @@ import asyncio
 import asyncpg
 import hypercorn.asyncio
 from aecp_platform.dbtenant import TenantScopedPool
+from aecp_platform.telemetry import init_tracing, shutdown_tracing
 from fastapi import FastAPI
 from hypercorn.config import Config
 
@@ -139,7 +140,15 @@ async def run() -> None:
 
 
 def main() -> None:
-    asyncio.run(run())
+    """Load Settings, init telemetry, and run the HTTP health server and
+    gRPC server concurrently.
+    """
+    settings = Settings.from_env()
+    init_tracing(service_name="state", collector_endpoint=settings.otel_collector_endpoint)
+    try:
+        asyncio.run(run())
+    finally:
+        shutdown_tracing()
 
 
 if __name__ == "__main__":

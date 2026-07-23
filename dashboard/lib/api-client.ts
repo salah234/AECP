@@ -6,6 +6,7 @@
  */
 
 const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? "";
+const JAEGER_URL = process.env.NEXT_PUBLIC_JAEGER_URL ?? "http://localhost:16686";
 
 export interface TaskNode {
   taskId: string;
@@ -47,6 +48,18 @@ export interface CreateTaskInput {
   description?: string;
   riskTier: string;
   pathGlobs?: string[];
+}
+
+export interface AssignmentDecision {
+  taskId: string;
+  agentId: string;
+  grantedRiskTier: string;
+  rationale: string;
+}
+
+export interface ScheduleResult {
+  decisions: AssignmentDecision[];
+  traceId: string;
 }
 
 /**
@@ -130,6 +143,30 @@ export async function updateTaskStatus(
     method: "POST",
     body: JSON.stringify({ status, reason }),
   });
+}
+
+export async function getTask(taskId: string): Promise<TaskNode> {
+  return request<TaskNode>(`/api/v1/tasks/${encodeURIComponent(taskId)}`);
+}
+
+/**
+ * Triggers Coordinator.Schedule for the caller's tenant (invokes an agent
+ * onto whatever ready task nodes exist) — see gateway/app/routers's
+ * coordinator schedule proxy. Returns the resulting assignment decisions
+ * plus the OTel trace id of this invocation for jaegerTraceUrl().
+ */
+export async function scheduleReadyWork(): Promise<ScheduleResult> {
+  return request<ScheduleResult>("/api/v1/coordinator/schedule", { method: "POST" });
+}
+
+/**
+ * Builds a Jaeger UI deep link for a trace id returned by
+ * scheduleReadyWork(). Callers should check for an empty traceId
+ * themselves (tracing unavailable for that request) rather than linking
+ * to a trace that doesn't exist.
+ */
+export function jaegerTraceUrl(traceId: string): string {
+  return `${JAEGER_URL}/trace/${traceId}`;
 }
 
 export async function getInterfaceContract(contractId: string): Promise<InterfaceContract> {

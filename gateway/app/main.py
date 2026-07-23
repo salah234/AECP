@@ -22,14 +22,19 @@ from datetime import datetime, timedelta, timezone
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind
 
 from aecp_platform.errors import PermissionDeniedError, UnauthenticatedError
+from aecp_platform.telemetry import init_tracing, shutdown_tracing
 from app import auth
 from app.config import Settings
 from app.deps import SESSION_COOKIE_NAME, RequestContext, get_request_context
 from app.proxy import InternalServiceClients
 from app.rate_limit import RateLimiter
-from app.routers import agents, decisions, escalations, tasks
+from app.routers import agents, coordinator, decisions, escalations, tasks
+
+_tracer = trace.get_tracer("aecp.gateway")
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +50,7 @@ async def lifespan(app: FastAPI):
     global _ready
 
     settings = Settings.from_env()
+    init_tracing(service_name="gateway", collector_endpoint=settings.otel_collector_endpoint)
     app.state.settings = settings
     app.state.oidc_client = auth.OIDCClient(
         settings.oidc_issuer_url,
@@ -58,6 +64,7 @@ async def lifespan(app: FastAPI):
     _ready = True
     yield
     _ready = False
+    shutdown_tracing()
 
 
 app = FastAPI(title="aecp-gateway", lifespan=lifespan)
@@ -77,8 +84,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+@app.middleware("http")
+async def tracing_middleware(request: Request, call_next):
+    """Open a SERVER span per inbound request, so the trace_id gateway
+    hands back from an action like POST /api/v1/coordinator/schedule
+    (see routers/coordinator.py's use of
+    aecp_platform.telemetry.current_trace_id_hex) actually roots the
+    whole downstream call chain, rather than starting mid-trace at
+    whichever internal service happens to run TracingServerInterceptor
+    first. Manual rather than opentelemetry-instrumentation-fastapi: this
+    codebase prefers a small amount of explicit code here over a new
+    dependency for what is otherwise a two-line span.
+    """
+    with _tracer.start_as_current_span(
+        f"{request.method} {request.url.path}", kind=SpanKind.SERVER
+    ):
+        return await call_next(request)
+
+
 app.include_router(tasks.router)
 app.include_router(agents.router)
+app.include_router(coordinator.router)
 app.include_router(decisions.router)
 app.include_router(escalations.router)
 
@@ -159,7 +185,19 @@ async def dev_login(
 
 @app.get("/auth/login")
 async def login(request: Request) -> RedirectResponse:
-    """Redirect to the OIDC provider's authorization endpoint."""
+    """Redirect to the OIDC provider's authorization endpoint.
+
+    In dev (no real OIDC secret configured — see /auth/dev-login), hand
+    off to the bypass instead of building a real authorization URL that
+    would only 401 at the IdP. This is the single entry point
+    AuthGuard.tsx already calls on every unauthenticated page load, so
+    gating here — rather than in the dashboard — means the dashboard
+    needs no dev-vs-real-IdP branching of its own.
+    """
+    settings = request.app.state.settings
+    if settings.oidc_client_secret_key == _DEV_OIDC_SECRET_PLACEHOLDER:
+        return RedirectResponse(str(request.url_for("dev_login")))
+
     state = secrets.token_urlsafe(32)
     redirect = RedirectResponse(request.app.state.oidc_client.authorization_redirect_url(state))
     redirect.set_cookie(

@@ -73,6 +73,9 @@ class FakeStateRepository:
 
         return await self.get_decisions_by_task(ownership_record.last_task_id)
 
+    async def get_recent_decisions(self, limit: int) -> list[DecisionLogEntry]:
+        return sorted(self.decisions, key=lambda e: e.decided_at, reverse=True)[:limit]
+
     # -- ownership ----------------------------------------------------------
 
     async def upsert_ownership(self, record: OwnershipRecord) -> None:

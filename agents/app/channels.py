@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import grpc
+from aecp_platform.tracing_grpc import TracingClientInterceptor
 
 CALLER_ID_METADATA_KEY = "caller-id"
 
@@ -26,15 +27,17 @@ def build_client_channel(
     mtls_key_file: str,
     mtls_ca_file: str,
 ) -> grpc.aio.Channel:
+    interceptors = [TracingClientInterceptor()]
+
     if mtls_cert_file and mtls_key_file and mtls_ca_file:
         credentials = grpc.ssl_channel_credentials(
             root_certificates=Path(mtls_ca_file).read_bytes(),
             private_key=Path(mtls_key_file).read_bytes(),
             certificate_chain=Path(mtls_cert_file).read_bytes(),
         )
-        return grpc.aio.secure_channel(target, credentials)
+        return grpc.aio.secure_channel(target, credentials, interceptors=interceptors)
 
-    return grpc.aio.insecure_channel(target)
+    return grpc.aio.insecure_channel(target, interceptors=interceptors)
 
 
 def caller_metadata(caller_id: str) -> tuple[tuple[str, str], ...]:

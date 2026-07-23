@@ -39,3 +39,6 @@ class DecisionLog:
 
     async def history_for_module(self, tenant_id: str, module_path: str) -> list[DecisionLogEntry]:
         return await self.repository.get_decisions_for_module(tenant_id, module_path)
+
+    async def recent(self, limit: int) -> list[DecisionLogEntry]:
+        return await self.repository.get_recent_decisions(limit)

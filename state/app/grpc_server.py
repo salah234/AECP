@@ -9,6 +9,7 @@ from uuid import uuid4
 import grpc
 import grpc.aio
 from aecp_platform.dbtenant import TenantID, bind_tenant
+from aecp_platform.tracing_grpc import TracingServerInterceptor
 from grpc_reflection.v1alpha import reflection
 
 from app.common.v1 import common_pb2
@@ -16,6 +17,20 @@ from app.decision_log import DecisionLogEntry
 from app.drift import DriftReport
 from app.state.v1 import state_pb2, state_pb2_grpc
 from app.interceptors import AllowListInterceptor
+
+# decision_log_entries.decided_by_kind's CHECK constraint
+# (state/migrations/0001_state_layer.sql) expects these short forms, not
+# the proto enum's own name (Actor.Kind.Name(...) would produce
+# "KIND_AGENT" etc.) — mirrors taskgraph/app/grpc_server.py's
+# _TASK_STATUS_FROM_PROTO/_TO_PROTO pattern for the same kind of
+# proto-enum-to-DB-string boundary.
+_ACTOR_KIND_TO_DB = {
+    common_pb2.Actor.KIND_HUMAN: "human",
+    common_pb2.Actor.KIND_AGENT: "agent",
+    common_pb2.Actor.KIND_COORDINATOR: "coordinator",
+}
+_DB_TO_ACTOR_KIND = {v: k for k, v in _ACTOR_KIND_TO_DB.items()}
+_DEFAULT_LIST_DECISIONS_LIMIT = 50
 
 
 @dataclass(frozen=True)
@@ -53,15 +68,21 @@ class StateServicer:
     async def RecordDecision(self, request, context):
         request_entry = request.entry
         bind_tenant(TenantID(request_entry.tenant_id))
+
+        decided_by_kind = _ACTOR_KIND_TO_DB.get(request_entry.decided_by.kind)
+        if decided_by_kind is None:
+            await context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "entry.decided_by.kind must be explicitly set to HUMAN, AGENT, or COORDINATOR",
+            )
+
         entry = DecisionLogEntry(
             entry_id=request_entry.entry_id,
             tenant_id=request_entry.tenant_id,
             task_id=request_entry.task_id,
             summary=request_entry.summary,
             rationale=request_entry.rationale,
-            decided_by_kind=common_pb2.Actor.Kind.Name(
-                request_entry.decided_by.kind,
-            ),
+            decided_by_kind=decided_by_kind,
             decided_by_id=request_entry.decided_by.id,
             decided_at=request_entry.decided_at.ToDatetime(),
         )
@@ -80,7 +101,35 @@ class StateServicer:
         return state_pb2.RecordDecisionResponse(
             entry=proto_entry
         )
-        
+
+    async def ListDecisions(self, request, context):
+        bind_tenant(TenantID(request.tenant_id))
+
+        if request.task_id:
+            entries = await self.decision_log.history_for_task(request.task_id)
+        else:
+            entries = await self.decision_log.recent(request.limit or _DEFAULT_LIST_DECISIONS_LIMIT)
+
+        proto_entries = []
+        for entry in entries:
+            proto_entry = state_pb2.DecisionLogEntry(
+                entry_id=entry.entry_id,
+                tenant_id=entry.tenant_id,
+                task_id=entry.task_id,
+                summary=entry.summary,
+                rationale=entry.rationale,
+                decided_by=common_pb2.Actor(
+                    kind=_DB_TO_ACTOR_KIND.get(
+                        entry.decided_by_kind, common_pb2.Actor.KIND_UNSPECIFIED
+                    ),
+                    id=entry.decided_by_id,
+                ),
+            )
+            proto_entry.decided_at.FromDatetime(entry.decided_at)
+            proto_entries.append(proto_entry)
+
+        return state_pb2.ListDecisionsResponse(entries=proto_entries)
+
     async def GetOwnership(self, request, context):
         bind_tenant(TenantID(request.tenant_id))
         ownership_record = await self.ownership_map.get(
@@ -171,7 +220,8 @@ def build_server(
 
     server = grpc.aio.server(
         interceptors=[
-            AllowListInterceptor(allow_list)
+            TracingServerInterceptor(),
+            AllowListInterceptor(allow_list),
         ]
     )
 

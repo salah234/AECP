@@ -2,9 +2,10 @@ import datetime
 
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from common.v1 import common_pb2 as _common_pb2
+from google.protobuf.internal import containers as _containers
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from collections.abc import Mapping as _Mapping
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
 from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
@@ -84,6 +85,22 @@ class RecordDecisionResponse(_message.Message):
     ENTRY_FIELD_NUMBER: _ClassVar[int]
     entry: DecisionLogEntry
     def __init__(self, entry: _Optional[_Union[DecisionLogEntry, _Mapping]] = ...) -> None: ...
+
+class ListDecisionsRequest(_message.Message):
+    __slots__ = ("tenant_id", "task_id", "limit")
+    TENANT_ID_FIELD_NUMBER: _ClassVar[int]
+    TASK_ID_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    tenant_id: str
+    task_id: str
+    limit: int
+    def __init__(self, tenant_id: _Optional[str] = ..., task_id: _Optional[str] = ..., limit: _Optional[int] = ...) -> None: ...
+
+class ListDecisionsResponse(_message.Message):
+    __slots__ = ("entries",)
+    ENTRIES_FIELD_NUMBER: _ClassVar[int]
+    entries: _containers.RepeatedCompositeFieldContainer[DecisionLogEntry]
+    def __init__(self, entries: _Optional[_Iterable[_Union[DecisionLogEntry, _Mapping]]] = ...) -> None: ...
 
 class GetOwnershipRequest(_message.Message):
     __slots__ = ("tenant_id", "module_path")

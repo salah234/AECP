@@ -6,6 +6,7 @@ option go_package = "aecp/proto/coordinator/v1;coordinatorv1";
 
 import "google/protobuf/timestamp.proto";
 import "common/v1/common.proto";
+import "agents/v1/agents.proto";
 
 // AssignmentRequest is raised by the scheduler when a task node becomes
 // ready (all dependencies satisfied) and needs an agent.
@@ -57,6 +58,26 @@ message ReportBlockerResponse {
   bool acknowledged = 1;
 }
 
+message ReportCompletionRequest {
+  string task_id = 1;
+  string agent_id = 2;
+  string tenant_id = 3; // see EscalateRequest.tenant_id
+  string summary = 4;   // short "what was done"
+  string rationale = 5; // fuller explanation, becomes the decision log rationale
+}
+
+message ReportCompletionResponse {
+  bool acknowledged = 1;
+}
+
+message ListAgentSessionsRequest {
+  string tenant_id = 1;
+}
+
+message ListAgentSessionsResponse {
+  repeated aecp.agents.v1.AgentSession sessions = 1;
+}
+
 // CoordinatorService is the only component allowed to make cross-agent
 // tradeoffs: scheduling, assignment, and escalation decisions. Agent
 // workers never talk to each other directly; everything routes here.
@@ -72,4 +93,15 @@ service CoordinatorService {
   rpc Escalate(EscalateRequest) returns (EscalateResponse);
 
   rpc ReportBlocker(ReportBlockerRequest) returns (ReportBlockerResponse);
+
+  // ReportCompletion is called by an agent session that finished its task.
+  // Transitions the task to IN_REVIEW, not DONE — see
+  // coordinator/app/tradeoff.py's report_completion for why.
+  rpc ReportCompletion(ReportCompletionRequest) returns (ReportCompletionResponse);
+
+  // ListAgentSessions is a read-only proxy over AgentPoolService.ListSessions:
+  // Gateway has no network edge to Agent Pool (and never should, per
+  // CLAUDE.md's "everything routes through the Coordinator"), so this is
+  // how the dashboard's Agents page sees live session data.
+  rpc ListAgentSessions(ListAgentSessionsRequest) returns (ListAgentSessionsResponse);
 }

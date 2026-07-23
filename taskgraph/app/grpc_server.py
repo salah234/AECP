@@ -14,6 +14,8 @@ from grpc_reflection.v1alpha import reflection
 
 from app.common.v1 import common_pb2
 from app.graph import CycleDetectedError, DanglingDependencyError
+from aecp_platform.tracing_grpc import TracingServerInterceptor
+
 from app.interceptors import AllowListInterceptor
 from app.risk_tier import requires_human_approval
 from app.schema import DefinitionOfDone, OwnershipBoundary, RiskTier, TaskNode, TaskStatus
@@ -231,7 +233,9 @@ def build_server(
     """Construct a grpc.aio.Server bound to the given servicer, with the
     mTLS server credentials and caller allow-list interceptor applied.
     """
-    server = grpc.aio.server(interceptors=[AllowListInterceptor(allow_list)])
+    server = grpc.aio.server(
+        interceptors=[TracingServerInterceptor(), AllowListInterceptor(allow_list)]
+    )
 
     taskgraph_pb2_grpc.add_TaskGraphServiceServicer_to_server(servicer, server)
 

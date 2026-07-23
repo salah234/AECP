@@ -109,6 +109,14 @@ message TerminateSessionResponse {
   bool terminated = 1;
 }
 
+message ListSessionsRequest {
+  string tenant_id = 1;
+}
+
+message ListSessionsResponse {
+  repeated AgentSession sessions = 1;
+}
+
 // AgentPoolService manages agent lifecycle: spin-up, context hydration,
 // handoff, and teardown. It never mediates communication between two
 // agent sessions.
@@ -117,4 +125,5 @@ service AgentPoolService {
   rpc HydrateContext(HydrateContextRequest) returns (HydrateContextResponse);
   rpc HandoffSession(HandoffSessionRequest) returns (HandoffSessionResponse);
   rpc TerminateSession(TerminateSessionRequest) returns (TerminateSessionResponse);
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
 }

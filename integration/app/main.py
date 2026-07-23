@@ -5,11 +5,12 @@ from __future__ import annotations
 import asyncio
 
 import uvicorn
+from aecp_platform.telemetry import init_tracing, shutdown_tracing
 from fastapi import FastAPI
 
 from app.channels import build_client_channel
-from app.conflict import ConflictDetector
 from app.config import Settings
+from app.conflict import ConflictDetector
 from app.grpc_server import IntegrationServicer, build_server
 from app.merge_policy import MergePolicyResolver
 from app.semantic_diff import SemanticDiffer
@@ -104,7 +105,12 @@ def main() -> None:
     """Load Settings, init telemetry, and run the HTTP health server and
     gRPC server concurrently.
     """
-    asyncio.run(run())
+    settings = Settings.from_env()
+    init_tracing(service_name="integration", collector_endpoint=settings.otel_collector_endpoint)
+    try:
+        asyncio.run(run())
+    finally:
+        shutdown_tracing()
 
 
 if __name__ == "__main__":

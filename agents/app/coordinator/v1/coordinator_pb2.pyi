@@ -1,5 +1,6 @@
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from common.v1 import common_pb2 as _common_pb2
+from agents.v1 import agents_pb2 as _agents_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
@@ -79,3 +80,35 @@ class ReportBlockerResponse(_message.Message):
     ACKNOWLEDGED_FIELD_NUMBER: _ClassVar[int]
     acknowledged: bool
     def __init__(self, acknowledged: _Optional[bool] = ...) -> None: ...
+
+class ReportCompletionRequest(_message.Message):
+    __slots__ = ("task_id", "agent_id", "tenant_id", "summary", "rationale")
+    TASK_ID_FIELD_NUMBER: _ClassVar[int]
+    AGENT_ID_FIELD_NUMBER: _ClassVar[int]
+    TENANT_ID_FIELD_NUMBER: _ClassVar[int]
+    SUMMARY_FIELD_NUMBER: _ClassVar[int]
+    RATIONALE_FIELD_NUMBER: _ClassVar[int]
+    task_id: str
+    agent_id: str
+    tenant_id: str
+    summary: str
+    rationale: str
+    def __init__(self, task_id: _Optional[str] = ..., agent_id: _Optional[str] = ..., tenant_id: _Optional[str] = ..., summary: _Optional[str] = ..., rationale: _Optional[str] = ...) -> None: ...
+
+class ReportCompletionResponse(_message.Message):
+    __slots__ = ("acknowledged",)
+    ACKNOWLEDGED_FIELD_NUMBER: _ClassVar[int]
+    acknowledged: bool
+    def __init__(self, acknowledged: _Optional[bool] = ...) -> None: ...
+
+class ListAgentSessionsRequest(_message.Message):
+    __slots__ = ("tenant_id",)
+    TENANT_ID_FIELD_NUMBER: _ClassVar[int]
+    tenant_id: str
+    def __init__(self, tenant_id: _Optional[str] = ...) -> None: ...
+
+class ListAgentSessionsResponse(_message.Message):
+    __slots__ = ("sessions",)
+    SESSIONS_FIELD_NUMBER: _ClassVar[int]
+    sessions: _containers.RepeatedCompositeFieldContainer[_agents_pb2.AgentSession]
+    def __init__(self, sessions: _Optional[_Iterable[_Union[_agents_pb2.AgentSession, _Mapping]]] = ...) -> None: ...

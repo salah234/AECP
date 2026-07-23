@@ -13,6 +13,7 @@ import asyncio
 import grpc
 import uvicorn
 from aecp_platform.identity import AllowList, MTLSConfig, ServiceID
+from aecp_platform.telemetry import init_tracing, shutdown_tracing
 from fastapi import FastAPI
 
 from app.agent_pool_client import AgentPoolClient
@@ -87,6 +88,7 @@ async def serve_grpc() -> None:
         scheduler=scheduler,
         assignment_engine=assignment_engine,
         tradeoff_resolver=tradeoff_resolver,
+        agent_pool_client=agent_pool_client,
     )
 
     mtls_config = None
@@ -127,10 +129,15 @@ async def run() -> None:
 
 
 def main() -> None:
-    """Load Settings and run the HTTP health server and gRPC server
-    concurrently.
+    """Load Settings, init telemetry, and run the HTTP health server and
+    gRPC server concurrently.
     """
-    asyncio.run(run())
+    settings = Settings.from_env()
+    init_tracing(service_name="coordinator", collector_endpoint=settings.otel_collector_endpoint)
+    try:
+        asyncio.run(run())
+    finally:
+        shutdown_tracing()
 
 
 if __name__ == "__main__":

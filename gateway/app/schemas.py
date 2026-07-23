@@ -8,7 +8,9 @@ which camelCase fields it reads — these helpers produce just those.
 
 from __future__ import annotations
 
+from app.agents.v1 import agents_pb2
 from app.common.v1 import common_pb2
+from app.coordinator.v1 import coordinator_pb2
 from app.state.v1 import state_pb2
 from app.taskgraph.v1 import taskgraph_pb2
 
@@ -56,6 +58,27 @@ def decision_log_entry_to_dict(entry: "state_pb2.DecisionLogEntry") -> dict:
         "rationale": entry.rationale,
         "decidedByKind": common_pb2.Actor.Kind.Name(entry.decided_by.kind),
         "decidedById": entry.decided_by.id,
+    }
+
+
+def agent_session_status_to_str(value: int) -> str:
+    return agents_pb2.AgentSessionStatus.Name(value).removeprefix("AGENT_SESSION_STATUS_").lower()
+
+
+def agent_session_to_dict(session: "agents_pb2.AgentSession") -> dict:
+    return {
+        "sessionId": session.session_id,
+        "taskId": session.task_id,
+        "status": agent_session_status_to_str(session.status),
+    }
+
+
+def assignment_decision_to_dict(decision: "coordinator_pb2.AssignmentDecision") -> dict:
+    return {
+        "taskId": decision.task_id,
+        "agentId": decision.agent_id,
+        "grantedRiskTier": risk_tier_to_str(decision.granted_risk_tier),
+        "rationale": decision.rationale,
     }
 
 

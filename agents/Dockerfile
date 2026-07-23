@@ -31,6 +31,20 @@ RUN uv venv /opt/venv && uv pip install --no-editable --python /opt/venv/bin/pyt
 # matching-version distroless image, which Google does not yet publish
 # for 3.12.
 FROM python:3.12-slim AS runtime
+# Real agent execution (app/executor.py) shells out to the `claude` CLI
+# against a git checkout of the target codebase — needs Node.js (the
+# CLI's runtime) and git, neither of which this image needed before it
+# only did session bookkeeping. NodeSource's setup script pins a known
+# major (20.x) rather than risking bookworm-slim's inconsistent default
+# apt nodejs version. curl/gnupg are purged after install — only needed
+# for the NodeSource script itself.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git ca-certificates curl gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install -g @anthropic-ai/claude-code \
+    && apt-get purge -y curl gnupg && apt-get autoremove -y \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN useradd --no-create-home --uid 65532 nonroot
 WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv

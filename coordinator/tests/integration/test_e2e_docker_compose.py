@@ -146,15 +146,40 @@ async def test_full_task_lifecycle_across_real_services(tenant_id: str) -> None:
         )
         assert hydrate_response.context_bundle
 
-    # 4. Confirm the real TaskGraph container now reflects ASSIGNED —
-    #    proves AssignmentEngine's UpdateTaskStatus call landed for real.
-    async with grpc.aio.insecure_channel(TASKGRAPH_ADDR) as channel:
-        taskgraph_stub = taskgraph_pb2_grpc.TaskGraphServiceStub(channel)
-        get_response = await taskgraph_stub.GetTaskNode(
-            taskgraph_pb2.GetTaskNodeRequest(task_id=task_id, tenant_id=tenant_id),
-            metadata=_caller_metadata("coordinator"),
-        )
-        assert get_response.node.status == common_pb2.TASK_STATUS_ASSIGNED
+    # 4. Confirm the real TaskGraph container reflects the outcome of
+    #    assignment. AssignmentEngine's own UpdateTaskStatus(ASSIGNED)
+    #    call (inside step 2's Schedule RPC) always lands first, but this
+    #    topology's agents container has neither TARGET_REPO_PATH/URL nor
+    #    ANTHROPIC_API_KEY configured (deliberately — real credentials
+    #    never belong in a checked-in compose file), so SpawnSession's
+    #    fire-and-forget AgentExecutor (agents/app/executor.py) always
+    #    fails the checkout step (target_repo.py: "cannot check out a
+    #    codebase") and self-reports a blocker back through Coordinator
+    #    before this poll observes the row — ASSIGNED is real but
+    #    transient here, not this test's terminal state. Polling (rather
+    #    than a single immediate read) proves the full real-execution
+    #    round trip (Agents -> Coordinator -> TaskGraph) actually landed,
+    #    not just that it started.
+    async def _poll_status() -> common_pb2.TaskStatus:
+        deadline = time.monotonic() + 10.0
+        last_status = common_pb2.TASK_STATUS_PENDING
+        async with grpc.aio.insecure_channel(TASKGRAPH_ADDR) as channel:
+            taskgraph_stub = taskgraph_pb2_grpc.TaskGraphServiceStub(channel)
+            while time.monotonic() < deadline:
+                get_response = await taskgraph_stub.GetTaskNode(
+                    taskgraph_pb2.GetTaskNodeRequest(task_id=task_id, tenant_id=tenant_id),
+                    metadata=_caller_metadata("coordinator"),
+                )
+                last_status = get_response.node.status
+                if last_status == common_pb2.TASK_STATUS_BLOCKED:
+                    return last_status
+                await asyncio.sleep(0.1)
+        return last_status
+
+    assert await _poll_status() == common_pb2.TASK_STATUS_BLOCKED, (
+        "expected the unconfigured AgentExecutor to self-report a blocker, "
+        "landing the task as BLOCKED"
+    )
 
     # 5. Escalate to an Architectural tier: must route to a human, never
     #    auto-approved by Coordinator alone (Escalation Policy). This

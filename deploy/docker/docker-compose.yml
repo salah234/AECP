@@ -79,6 +79,13 @@ services:
     env_file: ../../.env
     # ALLOWED_CALLERS="coordinator" from the shared .env is already correct
     # here (see deploy/k8s/networkpolicy/agents-edges.yaml) — no override.
+    # Optional bind mount for local TARGET_REPO_PATH usage (real agent
+    # execution, see agents/app/target_repo.py): set TARGET_REPO_HOST_PATH
+    # in .env to a real checkout on the host and TARGET_REPO_PATH=/target-repo
+    # to use it. Defaults to /dev/null (a harmless no-op mount) when unset,
+    # so this never breaks `docker compose up` for anyone not using it.
+    volumes:
+      - ${TARGET_REPO_HOST_PATH:-/dev/null}:/target-repo:rw
     networks: [aecp]
 
   integration:

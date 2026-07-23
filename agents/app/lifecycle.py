@@ -23,7 +23,7 @@ correctly discards it along with every sandbox it was tracking.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -60,6 +60,11 @@ class LifecycleManager:
         self._lock = asyncio.Lock()
         self._sessions: dict[str, AgentSession] = {}
         self._sandbox_handles: dict[str, object] = {}
+        # Settable post-construction, not a constructor param: AgentExecutor
+        # needs a hydrator, which needs this LifecycleManager — a straight
+        # constructor dependency in the other direction would be circular.
+        # See main.py's serve_grpc for the wiring order.
+        self.execution_canceller: Callable[[str], Awaitable[None]] | None = None
 
     async def spawn(
         self,
@@ -101,11 +106,19 @@ class LifecycleManager:
         async with self._lock:
             return self._sessions.get(session_id)
 
+    async def get_sandbox_handle(self, session_id: str):
+        async with self._lock:
+            return self._sandbox_handles.get(session_id)
+
     async def count_active(self, tenant_id: str) -> int:
         async with self._lock:
             return sum(
                 1 for s in self._sessions.values() if s.tenant_id == tenant_id
             )
+
+    async def list_active(self, tenant_id: str) -> list[AgentSession]:
+        async with self._lock:
+            return [s for s in self._sessions.values() if s.tenant_id == tenant_id]
 
     async def terminate(self, session_id: str, reason: str) -> None:
         """Tear down a session's sandbox and revoke its scoped credentials."""
@@ -131,6 +144,15 @@ class LifecycleManager:
 
         if session is None:
             return None
+
+        # Must happen before sandbox.destroy(): destroy() rmtree's the
+        # scratch dir unconditionally, with no awareness of a live
+        # AgentExecutor subprocess still writing into it. Cancelling here
+        # (rather than at each of TerminateSession/HandoffCoordinator.
+        # handoff/_reap_loop separately) keeps this single choke point as
+        # the one place that guarantees no execution outlives its sandbox.
+        if self.execution_canceller is not None:
+            await self.execution_canceller(session_id)
 
         if handle is not None:
             await self.sandbox.destroy(handle)

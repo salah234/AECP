@@ -199,6 +199,23 @@ class StateRepository:
 
         return [_decision_log_entry_from_row(row) for row in rows]
 
+    async def get_recent_decisions(self, limit: int) -> list[DecisionLogEntry]:
+        # No explicit tenant_id WHERE clause — same convention
+        # get_decisions_by_task already uses; RLS scopes this query to
+        # whatever tenant bind_tenant() bound at the servicer layer.
+        async with self.pool.transaction() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT *
+                FROM decision_log_entries
+                ORDER BY decided_at DESC
+                LIMIT $1
+                """,
+                limit,
+            )
+
+        return [_decision_log_entry_from_row(row) for row in rows]
+
     async def get_decisions_for_module(
         self,
         tenant_id: str,

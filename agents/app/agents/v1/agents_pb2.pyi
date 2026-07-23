@@ -123,3 +123,15 @@ class TerminateSessionResponse(_message.Message):
     TERMINATED_FIELD_NUMBER: _ClassVar[int]
     terminated: bool
     def __init__(self, terminated: _Optional[bool] = ...) -> None: ...
+
+class ListSessionsRequest(_message.Message):
+    __slots__ = ("tenant_id",)
+    TENANT_ID_FIELD_NUMBER: _ClassVar[int]
+    tenant_id: str
+    def __init__(self, tenant_id: _Optional[str] = ...) -> None: ...
+
+class ListSessionsResponse(_message.Message):
+    __slots__ = ("sessions",)
+    SESSIONS_FIELD_NUMBER: _ClassVar[int]
+    sessions: _containers.RepeatedCompositeFieldContainer[AgentSession]
+    def __init__(self, sessions: _Optional[_Iterable[_Union[AgentSession, _Mapping]]] = ...) -> None: ...

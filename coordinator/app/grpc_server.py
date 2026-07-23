@@ -10,6 +10,7 @@ from pathlib import Path
 
 import grpc
 import grpc.aio
+from aecp_platform.tracing_grpc import TracingServerInterceptor
 from grpc_reflection.v1alpha import reflection
 
 from app.coordinator.v1 import coordinator_pb2, coordinator_pb2_grpc
@@ -20,10 +21,11 @@ class CoordinatorServicer:
     (see proto/coordinator/v1/coordinator.proto).
     """
 
-    def __init__(self, scheduler, assignment_engine, tradeoff_resolver) -> None:
+    def __init__(self, scheduler, assignment_engine, tradeoff_resolver, agent_pool_client) -> None:
         self.scheduler = scheduler
         self.assignment_engine = assignment_engine
         self.tradeoff_resolver = tradeoff_resolver
+        self.agent_pool_client = agent_pool_client
 
     async def Schedule(self, request, context):
         if not request.tenant_id:
@@ -80,6 +82,32 @@ class CoordinatorServicer:
 
         return coordinator_pb2.ReportBlockerResponse(acknowledged=True)
 
+    async def ReportCompletion(self, request, context):
+        if not request.task_id:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "task_id is required")
+        if not request.tenant_id:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "tenant_id is required")
+
+        try:
+            await self.tradeoff_resolver.report_completion(
+                task_id=request.task_id,
+                tenant_id=request.tenant_id,
+                agent_id=request.agent_id,
+                summary=request.summary,
+                rationale=request.rationale,
+            )
+        except ValueError as exc:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
+
+        return coordinator_pb2.ReportCompletionResponse(acknowledged=True)
+
+    async def ListAgentSessions(self, request, context):
+        if not request.tenant_id:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "tenant_id is required")
+
+        sessions = await self.agent_pool_client.list_sessions(request.tenant_id)
+        return coordinator_pb2.ListAgentSessionsResponse(sessions=sessions)
+
 
 def _decision_to_proto(decision) -> coordinator_pb2.AssignmentDecision:
     return coordinator_pb2.AssignmentDecision(
@@ -112,7 +140,9 @@ def build_server(
     exactly like every other service (see aecp_platform.identity's
     _AllowListInterceptor).
     """
-    server = grpc.aio.server(interceptors=[allow_list.grpc_interceptor()])
+    server = grpc.aio.server(
+        interceptors=[TracingServerInterceptor(), allow_list.grpc_interceptor()]
+    )
 
     coordinator_pb2_grpc.add_CoordinatorServiceServicer_to_server(servicer, server)
 

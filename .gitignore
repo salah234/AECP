@@ -1,7 +1,7 @@
 # Secrets — never commit real values, only .env.example
 .env
 .env.*
-.env.example
+!.env.example
 
 # Python
 __pycache__/

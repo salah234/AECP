@@ -23,10 +23,11 @@ class HandoffRecord:
 
 
 class HandoffCoordinator:
-    def __init__(self, lifecycle_manager, hydrator, state_client) -> None:
+    def __init__(self, lifecycle_manager, hydrator, state_client, executor=None) -> None:
         self.lifecycle_manager = lifecycle_manager
         self.hydrator = hydrator
         self.state_client = state_client
+        self.executor = executor
 
     async def handoff(self, session_id: str, reason: str) -> AgentSession:
         """Terminate the old session, spawn a replacement session for the
@@ -61,6 +62,14 @@ class HandoffCoordinator:
             ownership_boundary=old_session.ownership_boundary,
             task_node_snapshot=old_session.task_node_snapshot,
         )
+
+        if self.executor is not None:
+            # The old session's execution was already cancelled above —
+            # terminate_and_return calls execution_canceller before this
+            # method's first line even returns (see lifecycle.py).
+            handle = await self.lifecycle_manager.get_sandbox_handle(new_session.session_id)
+            if handle is not None:
+                self.executor.spawn_background(new_session, handle.scratch_dir)
 
         try:
             await self.state_client.record_decision(

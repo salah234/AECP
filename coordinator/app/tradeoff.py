@@ -159,6 +159,43 @@ class TradeoffResolver:
             decided_by_id=agent_id,
         )
 
+    async def report_completion(
+        self, task_id: str, tenant_id: str, agent_id: str, summary: str, rationale: str
+    ) -> None:
+        """Record a task's completion and move it into human review.
+
+        Transitions to TASK_STATUS_IN_REVIEW, not TASK_STATUS_DONE: every
+        risk tier in CLAUDE.md's Escalation Policy implies some review
+        checkpoint before a task is truly finished, and this repo has no
+        CI-merge-gate integration yet that could safely auto-promote
+        straight to DONE. statemachine.py already models
+        IN_PROGRESS--complete-->IN_REVIEW and IN_REVIEW--approve-->DONE
+        for whoever/whatever approves it next.
+        """
+        node = await self.taskgraph_client.get_task_node(task_id, tenant_id)
+        if node is None:
+            raise ValueError(f"Cannot report completion for unknown task '{task_id}'")
+
+        await self.taskgraph_client.update_task_status(
+            task_id, tenant_id, TASK_STATE_TO_PROTO[TaskState.IN_REVIEW], reason=rationale
+        )
+
+        await self._audit(
+            tenant_id=tenant_id,
+            actor_id=agent_id,
+            action="report_completion",
+            resource=f"task:{task_id}",
+            security_relevant=False,
+        )
+        await self._record_decision(
+            tenant_id=tenant_id,
+            task_id=task_id,
+            summary=summary or "Task completed",
+            rationale=rationale,
+            decided_by_kind=common_pb2.Actor.KIND_AGENT,
+            decided_by_id=agent_id,
+        )
+
     async def _audit(
         self, *, tenant_id: str, actor_id: str, action: str, resource: str, security_relevant: bool
     ) -> None:

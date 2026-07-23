@@ -49,3 +49,10 @@ class AgentPoolClient:
             metadata=self._metadata,
         )
         return response.terminated
+
+    async def list_sessions(self, tenant_id: str) -> list[agents_pb2.AgentSession]:
+        response = await self._stub.ListSessions(
+            agents_pb2.ListSessionsRequest(tenant_id=tenant_id),
+            metadata=self._metadata,
+        )
+        return list(response.sessions)

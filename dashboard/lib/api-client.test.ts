@@ -4,7 +4,10 @@ import {
   ApiError,
   approveEscalation,
   createTask,
+  getTask,
+  jaegerTraceUrl,
   listReadyTasks,
+  scheduleReadyWork,
   updateTaskStatus,
 } from "./api-client";
 
@@ -116,5 +119,50 @@ describe("approveEscalation", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
 
     await expect(approveEscalation("t-1")).resolves.toBeUndefined();
+  });
+});
+
+describe("getTask", () => {
+  it("fetches a single task by id", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ taskId: "t-1", title: "x", status: "assigned", riskTier: "local" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const task = await getTask("t-1");
+
+    expect(task.status).toBe("assigned");
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/tasks/t-1"),
+      expect.objectContaining({ credentials: "include" }),
+    );
+  });
+});
+
+describe("scheduleReadyWork", () => {
+  it("posts to the coordinator schedule endpoint and returns decisions + traceId", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        decisions: [
+          { taskId: "t-1", agentId: "a-1", grantedRiskTier: "local", rationale: "only ready task" },
+        ],
+        traceId: "abc123",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await scheduleReadyWork();
+
+    expect(result.decisions).toHaveLength(1);
+    expect(result.traceId).toBe("abc123");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/v1/coordinator/schedule");
+    expect(init.method).toBe("POST");
+  });
+});
+
+describe("jaegerTraceUrl", () => {
+  it("builds a trace deep link", () => {
+    expect(jaegerTraceUrl("abc123")).toBe("http://localhost:16686/trace/abc123");
   });
 });

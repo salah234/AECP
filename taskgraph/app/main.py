@@ -8,6 +8,7 @@ import json
 import asyncpg
 import uvicorn
 from aecp_platform.dbtenant import TenantScopedPool
+from aecp_platform.telemetry import init_tracing, shutdown_tracing
 from fastapi import FastAPI
 
 from app import ownership
@@ -104,7 +105,12 @@ def main() -> None:
     """Load Settings, init telemetry, and run the HTTP health server and
     gRPC server concurrently.
     """
-    asyncio.run(run())
+    settings = Settings.from_env()
+    init_tracing(service_name="taskgraph", collector_endpoint=settings.otel_collector_endpoint)
+    try:
+        asyncio.run(run())
+    finally:
+        shutdown_tracing()
 
 
 if __name__ == "__main__":

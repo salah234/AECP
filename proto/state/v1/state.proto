@@ -54,6 +54,16 @@ message RecordDecisionResponse {
   DecisionLogEntry entry = 1;
 }
 
+message ListDecisionsRequest {
+  string tenant_id = 1;
+  string task_id = 2; // optional filter; empty = recent across the tenant
+  int32 limit = 3;    // optional; 0 = server default
+}
+
+message ListDecisionsResponse {
+  repeated DecisionLogEntry entries = 1;
+}
+
 message GetOwnershipRequest {
   string tenant_id = 1;
   string module_path = 2;
@@ -81,6 +91,7 @@ message ReportDriftResponse {
 
 service StateService {
   rpc RecordDecision(RecordDecisionRequest) returns (RecordDecisionResponse);
+  rpc ListDecisions(ListDecisionsRequest) returns (ListDecisionsResponse);
   rpc GetOwnership(GetOwnershipRequest) returns (GetOwnershipResponse);
   rpc GetInterfaceContract(GetInterfaceContractRequest) returns (GetInterfaceContractResponse);
   rpc ReportDrift(ReportDriftRequest) returns (ReportDriftResponse);

@@ -19,6 +19,11 @@ class StateServiceStub:
                 request_serializer=state_dot_v1_dot_state__pb2.RecordDecisionRequest.SerializeToString,
                 response_deserializer=state_dot_v1_dot_state__pb2.RecordDecisionResponse.FromString,
                 _registered_method=True)
+        self.ListDecisions = channel.unary_unary(
+                '/aecp.state.v1.StateService/ListDecisions',
+                request_serializer=state_dot_v1_dot_state__pb2.ListDecisionsRequest.SerializeToString,
+                response_deserializer=state_dot_v1_dot_state__pb2.ListDecisionsResponse.FromString,
+                _registered_method=True)
         self.GetOwnership = channel.unary_unary(
                 '/aecp.state.v1.StateService/GetOwnership',
                 request_serializer=state_dot_v1_dot_state__pb2.GetOwnershipRequest.SerializeToString,
@@ -40,6 +45,12 @@ class StateServiceServicer:
     """Missing associated documentation comment in .proto file."""
 
     def RecordDecision(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListDecisions(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -70,6 +81,11 @@ def add_StateServiceServicer_to_server(servicer, server):
                     servicer.RecordDecision,
                     request_deserializer=state_dot_v1_dot_state__pb2.RecordDecisionRequest.FromString,
                     response_serializer=state_dot_v1_dot_state__pb2.RecordDecisionResponse.SerializeToString,
+            ),
+            'ListDecisions': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListDecisions,
+                    request_deserializer=state_dot_v1_dot_state__pb2.ListDecisionsRequest.FromString,
+                    response_serializer=state_dot_v1_dot_state__pb2.ListDecisionsResponse.SerializeToString,
             ),
             'GetOwnership': grpc.unary_unary_rpc_method_handler(
                     servicer.GetOwnership,
@@ -114,6 +130,33 @@ class StateService:
             '/aecp.state.v1.StateService/RecordDecision',
             state_dot_v1_dot_state__pb2.RecordDecisionRequest.SerializeToString,
             state_dot_v1_dot_state__pb2.RecordDecisionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListDecisions(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/aecp.state.v1.StateService/ListDecisions',
+            state_dot_v1_dot_state__pb2.ListDecisionsRequest.SerializeToString,
+            state_dot_v1_dot_state__pb2.ListDecisionsResponse.FromString,
             options,
             channel_credentials,
             insecure,

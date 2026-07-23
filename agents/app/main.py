@@ -5,11 +5,16 @@ from __future__ import annotations
 import asyncio
 
 import uvicorn
+from aecp_platform.telemetry import init_tracing, shutdown_tracing
 from fastapi import FastAPI
 
 from app.channels import build_client_channel
 from app.config import Settings
 from app.coordinator_client import CoordinatorClient
+from app.execution_backends.base import ExecutionBackend
+from app.execution_backends.claude_cli import ClaudeCliBackend
+from app.execution_backends.cohere_backend import CohereBackend
+from app.executor import AgentExecutor
 from app.grpc_server import AgentPoolServicer, build_server
 from app.handoff import HandoffCoordinator
 from app.hydration import ContextHydrator
@@ -18,6 +23,7 @@ from app.lifecycle import LifecycleManager
 from app.pool import AgentPool
 from app.sandbox import Sandbox
 from app.state_client import StateClient
+from app.target_repo import TargetRepoCheckout
 
 app = FastAPI(title="aecp-agents")
 
@@ -107,10 +113,45 @@ async def serve_grpc() -> None:
     coordinator_client = CoordinatorClient(coordinator_channel, caller_id="agents")
 
     hydrator = ContextHydrator(lifecycle_manager=lifecycle_manager, state_client=state_client)
+
+    target_repo = TargetRepoCheckout(
+        repo_path=settings.target_repo_path,
+        repo_url=settings.target_repo_url,
+    )
+    backend: ExecutionBackend
+    if settings.agent_execution_backend == "cohere":
+        backend = CohereBackend(
+            cohere_api_key=settings.cohere_api_key,
+            cohere_model=settings.cohere_model,
+            max_iterations=settings.cohere_max_tool_iterations,
+        )
+    else:
+        backend = ClaudeCliBackend(
+            claude_binary=settings.claude_binary,
+            anthropic_api_key=settings.anthropic_api_key,
+            agent_model=settings.agent_model,
+            permission_mode=settings.agent_permission_mode,
+            allowed_tools=settings.agent_allowed_tools,
+        )
+    executor = AgentExecutor(
+        hydrator=hydrator,
+        coordinator_client=coordinator_client,
+        target_repo=target_repo,
+        backend=backend,
+        execution_timeout_seconds=settings.agent_execution_timeout_seconds,
+        lifecycle_manager=lifecycle_manager,
+    )
+    # Wired post-construction, not via LifecycleManager's constructor:
+    # AgentExecutor needs `hydrator`, which needs `lifecycle_manager` — a
+    # straight constructor dependency in the other direction would be
+    # circular. See lifecycle.py's execution_canceller docstring.
+    lifecycle_manager.execution_canceller = executor.cancel
+
     handoff_coordinator = HandoffCoordinator(
         lifecycle_manager=lifecycle_manager,
         hydrator=hydrator,
         state_client=state_client,
+        executor=executor,
     )
     pool = AgentPool(lifecycle_manager=lifecycle_manager)
 
@@ -119,6 +160,7 @@ async def serve_grpc() -> None:
         hydrator=hydrator,
         handoff_coordinator=handoff_coordinator,
         pool=pool,
+        executor=executor,
     )
 
     server = build_server(
@@ -142,6 +184,11 @@ async def serve_grpc() -> None:
         await server.wait_for_termination()
     finally:
         reap_task.cancel()
+        # Awaited (unlike reap_task.cancel() above, which doesn't wait
+        # for confirmation): an orphaned live claude subprocess matters
+        # more than an orphaned in-memory loop. See executor.shutdown's
+        # docstring.
+        await executor.shutdown()
 
 
 async def serve_http() -> None:
@@ -165,7 +212,12 @@ def main() -> None:
     """Load Settings, init telemetry, and run the HTTP health server and
     gRPC server concurrently.
     """
-    asyncio.run(run())
+    settings = Settings.from_env()
+    init_tracing(service_name="agents", collector_endpoint=settings.otel_collector_endpoint)
+    try:
+        asyncio.run(run())
+    finally:
+        shutdown_tracing()
 
 
 if __name__ == "__main__":

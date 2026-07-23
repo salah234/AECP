@@ -17,13 +17,20 @@ from app.hydration import ContextHydrator
 from app.lifecycle import LifecycleManager
 from app.pool import AgentPool
 
-from .fakes import AbortedRPC, FakeContext, FakeIdentityIssuer, FakeSandbox, FakeStateClient
+from .fakes import (
+    AbortedRPC,
+    FakeContext,
+    FakeExecutor,
+    FakeIdentityIssuer,
+    FakeSandbox,
+    FakeStateClient,
+)
 
 TENANT_ID = "11111111-1111-1111-1111-111111111111"
 TASK_ID = "22222222-2222-2222-2222-222222222222"
 
 
-def make_servicer(max_slots_per_tenant: int = 10):
+def make_servicer(max_slots_per_tenant: int = 10, executor=None):
     manager = LifecycleManager(
         sandbox=FakeSandbox(),
         identity_issuer=FakeIdentityIssuer(),
@@ -40,6 +47,7 @@ def make_servicer(max_slots_per_tenant: int = 10):
         hydrator=hydrator,
         handoff_coordinator=handoff_coordinator,
         pool=pool,
+        executor=executor,
     )
     return servicer, manager, pool
 
@@ -174,6 +182,28 @@ async def test_handoff_session_spawns_replacement_for_same_task() -> None:
     assert await manager.get(old_session_id) is None
 
 
+async def test_spawn_session_starts_execution_when_executor_wired() -> None:
+    executor = FakeExecutor()
+    servicer, manager, _pool = make_servicer(executor=executor)
+    context = FakeContext()
+
+    response = await servicer.SpawnSession(make_spawn_request(), context)
+    session_id = response.session.session_id
+
+    handle = await manager.get_sandbox_handle(session_id)
+    assert executor.spawn_background_calls == [(session_id, handle.scratch_dir)]
+
+
+async def test_spawn_session_without_executor_does_not_error() -> None:
+    # executor=None is the current default (make_servicer()'s own default) —
+    # existing behavior/tests above this one must stay unaffected by it.
+    servicer, _manager, _pool = make_servicer()
+    context = FakeContext()
+
+    response = await servicer.SpawnSession(make_spawn_request(), context)
+    assert response.session.session_id
+
+
 async def test_handoff_unknown_session_is_not_found() -> None:
     servicer, _manager, _pool = make_servicer()
     context = FakeContext()
@@ -185,3 +215,29 @@ async def test_handoff_unknown_session_is_not_found() -> None:
         )
 
     assert exc_info.value.code == grpc.StatusCode.NOT_FOUND
+
+
+async def test_list_sessions_returns_only_tenants_own_sessions() -> None:
+    servicer, _manager, _pool = make_servicer()
+    context = FakeContext()
+
+    spawn_response = await servicer.SpawnSession(make_spawn_request(), context)
+    await servicer.SpawnSession(
+        make_spawn_request(tenant_id="other-tenant", task_id="other-task"), context
+    )
+
+    response = await servicer.ListSessions(
+        agents_pb2.ListSessionsRequest(tenant_id=TENANT_ID), context
+    )
+
+    assert [s.session_id for s in response.sessions] == [spawn_response.session.session_id]
+
+
+async def test_list_sessions_requires_tenant_id() -> None:
+    servicer, _manager, _pool = make_servicer()
+    context = FakeContext()
+
+    with pytest.raises(AbortedRPC) as exc_info:
+        await servicer.ListSessions(agents_pb2.ListSessionsRequest(tenant_id=""), context)
+
+    assert exc_info.value.code == grpc.StatusCode.INVALID_ARGUMENT
